@@ -143,6 +143,10 @@ class FusionLayer(nn.Module):
             channels = self.base_channels * 2**i  if i < 4 else 512
             if i in out_indices:
                 if fusion_pattern == 'Conv':
+                    fusion_layer = ConvModule(in_channels=int(channels * self.channel_weight * 2),
+                              out_channels=int(channels * self.channel_weight),
+                              kernel_size=1)
+                elif fusion_pattern == 'ConvConv':
                     fusion_layer = CrossConv(
                         in_channels=int(channels * self.channel_weight * 2),
                         out_channels=int(channels * self.channel_weight),

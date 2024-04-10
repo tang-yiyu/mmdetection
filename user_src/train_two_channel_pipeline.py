@@ -27,7 +27,7 @@ Number = Union[int, float]
 
 
 @TRANSFORMS.register_module()
-class LoadTwoChannelImageFromFiles(LoadImageFromFile):
+class LoadTwoStreamImageFromFiles(LoadImageFromFile):
     """
     Load an image from file.
     """
@@ -95,7 +95,7 @@ class LoadTwoChannelImageFromFiles(LoadImageFromFile):
 
 
 @TRANSFORMS.register_module()
-class ResizeTwoChannel(Resize):
+class ResizeTwoStream(Resize):
     """
     Resize images & bbox & seg.
     """
@@ -149,7 +149,7 @@ class ResizeTwoChannel(Resize):
 
 
 @TRANSFORMS.register_module()
-class RandomFlipTwoChannel(RandomFlip):
+class RandomFlipTwoStream(RandomFlip):
     """
     Flip the image & bbox & mask & segmentation map. 
     """
@@ -209,7 +209,7 @@ class RandomFlipTwoChannel(RandomFlip):
 
 
 @TRANSFORMS.register_module()
-class RandomCropTwoChannel(RandomCrop):
+class RandomCropTwoStream(RandomCrop):
     """
     Random crop the image & bboxes & masks.
     """
@@ -325,7 +325,7 @@ class RandomCropTwoChannel(RandomCrop):
     
 
 @TRANSFORMS.register_module()
-class RandomErasingTwoChannel(RandomErasing):
+class RandomErasingTwoStream(RandomErasing):
     """
     RandomErasing operation.
     """
@@ -340,7 +340,7 @@ class RandomErasingTwoChannel(RandomErasing):
 
 
 @TRANSFORMS.register_module()
-class PackDetInputsTwoChannel(PackDetInputs):
+class PackDetInputsTwoStream(PackDetInputs):
     """Pack the inputs data for the detection / semantic segmentation /
     panoptic segmentation.
     """

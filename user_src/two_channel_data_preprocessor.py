@@ -19,7 +19,7 @@ from mmdet.registry import MODELS
 from mmdet.structures import DetDataSample
 
 @MODELS.register_module()
-class TwoChannelImgDataPreprocessor(ImgDataPreprocessor):
+class TwoStreamImgDataPreprocessor(ImgDataPreprocessor):
     """Image pre-processor for normalization and bgr to rgb conversion.
 
     Accepts the data sampled by the dataloader, and preprocesses it into the
@@ -201,7 +201,7 @@ class TwoChannelImgDataPreprocessor(ImgDataPreprocessor):
         return data
 
 @MODELS.register_module()
-class TwoChannelDetDataPreprocessor(TwoChannelImgDataPreprocessor):
+class TwoStreamDetDataPreprocessor(TwoStreamImgDataPreprocessor):
     """Image pre-processor for detection tasks.
 
     Comparing with the :class:`mmengine.ImgDataPreprocessor`,

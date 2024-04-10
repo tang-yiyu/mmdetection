@@ -7,11 +7,11 @@ image_size=(640, 640)
 dataset_type = 'CocoDataset'
 classes = ('person')
 data_root='data/kaist_onlyperson/'
-work_dir = './work_dirs/kaist_onlyperson_faster-rcnn_r50_fpn_1x_coco/'
+work_dir = './work_dirs/kaist_onlyperson_C3_faster-rcnn_r50_fpn_1x_coco2/'
 
 default_hooks = dict(
     checkpoint=dict(interval=1, save_best='coco/bbox_mAP_50', rule='greater', type='CheckpointHook'),
-    visualization=dict(score_thr=0.001, type='TwoChannelDetVisualizationHook'))
+    visualization=dict(type='TwoStreamDetVisualizationHook'))
 
 model = dict(
     fusion_layers=dict(
@@ -22,7 +22,7 @@ model = dict(
         channel_weight=4,
         fusion_pattern='C3'),
     data_preprocessor=dict(
-        type='TwoChannelDetDataPreprocessor'),
+        type='TwoStreamDetDataPreprocessor'),
     neck=dict(
         num_outs=3,
         end_level=2),
@@ -49,46 +49,29 @@ model = dict(
             max_per_img=100,
             nms=dict(iou_threshold=0.5, type='nms'),
             score_thr=0.001)),
-    type='TwoChannelFasterRCNN')
-
-optim_wrapper = dict(
-    _delete_=True,
-    type='OptimWrapper',
-    optimizer=dict(
-        type='AdamW',
-        lr=0.0001,
-        weight_decay=0.05,
-        eps=1e-8,
-        betas=(0.9, 0.999)),
-    paramwise_cfg=dict(
-        custom_keys={
-            'backbone_rgb': dict(lr_mult=0.1, decay_mult=1.0),
-            'backbone_ir': dict(lr_mult=0.1, decay_mult=1.0),
-        },
-        norm_decay_mult=0.0),
-    clip_grad=dict(max_norm=0.01, norm_type=2))
+    type='TwoStreamFasterRCNN')
 
 train_cfg = dict(max_epochs=20, type='EpochBasedTrainLoop', val_interval=1)
 
 train_pipeline = [
-    dict(backend_args=None, type='LoadTwoChannelImageFromFiles'),
+    dict(backend_args=None, type='LoadTwoStreamImageFromFiles'),
     dict(type='LoadAnnotations', with_bbox=True),
     dict(
         type='RandomResize',
         scale=image_size,
         ratio_range=(0.5, 2.0),
-        resize_type='ResizeTwoChannel',
+        resize_type='ResizeTwoStream',
         keep_ratio=True),
-    # dict(keep_ratio=True, scale=image_size, type='ResizeTwoChannel'),
+    # dict(keep_ratio=True, scale=image_size, type='ResizeTwoStream'),
     dict(
-        type='RandomCropTwoChannel',
+        type='RandomCropTwoStream',
         crop_type='absolute_range',
         crop_size=image_size,
         recompute_bbox=True,
         allow_negative_crop=True),
-    dict(type='RandomErasingTwoChannel', n_patches=(1, 5), ratio=(0, 0.2)),
-    dict(prob=0.5, type='RandomFlipTwoChannel'),
-    dict(type='PackDetInputsTwoChannel'),
+    dict(type='RandomErasingTwoStream', n_patches=(1, 5), ratio=(0, 0.2)),
+    dict(prob=0.5, type='RandomFlipTwoStream'),
+    dict(type='PackDetInputsTwoStream'),
 ]
 
 train_dataloader = dict(
@@ -108,11 +91,11 @@ val_evaluator = dict(
     ann_file='data/kaist_onlyperson/annotations/val.json')
 
 val_pipeline = [
-    dict(backend_args=None, type='LoadTwoChannelImageFromFiles'),
+    dict(backend_args=None, type='LoadTwoStreamImageFromFiles'),
     dict(keep_ratio=True, scale=(
         1333,
         800,
-    ), type='ResizeTwoChannel'),
+    ), type='ResizeTwoStream'),
     dict(type='LoadAnnotations', with_bbox=True),
     dict(
         meta_keys=(
@@ -122,7 +105,7 @@ val_pipeline = [
             'img_shape',
             'scale_factor',
         ),
-        type='PackDetInputsTwoChannel'),
+        type='PackDetInputsTwoStream'),
 ]
 
 val_dataloader = dict(
@@ -143,11 +126,11 @@ test_evaluator = dict(
     type='CocoMetricMod')
 
 test_pipeline = [
-    dict(backend_args=None, type='LoadTwoChannelImageFromFiles'),
+    dict(backend_args=None, type='LoadTwoStreamImageFromFiles'),
     dict(keep_ratio=True, scale=(
         1333,
         800,
-    ), type='ResizeTwoChannel'),
+    ), type='ResizeTwoStream'),
     dict(type='LoadAnnotations', with_bbox=True),
     dict(
         meta_keys=(
@@ -157,7 +140,7 @@ test_pipeline = [
             'img_shape',
             'scale_factor',
         ),
-        type='PackDetInputsTwoChannel'),
+        type='PackDetInputsTwoStream'),
 ]
 
 test_dataloader = dict(

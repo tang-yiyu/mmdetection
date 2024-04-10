@@ -14,7 +14,7 @@ from mmdet.structures import DetDataSample
 
 
 @HOOKS.register_module()
-class TwoChannelDetVisualizationHook(DetVisualizationHook):
+class TwoStreamDetVisualizationHook(DetVisualizationHook):
     """Detection Visualization Hook. Used to visualize validation and testing
     process prediction results.
 

@@ -12,7 +12,7 @@ from mmdet.models.detectors.base import BaseDetector
 
 
 @MODELS.register_module()
-class TwoChannelTwoStageDetector(BaseDetector):
+class TwoStreamFasterRCNN(BaseDetector):
     """Base class for two-stage detectors.
 
     Two-stage detectors typically consisting of a region proposal network and a
@@ -262,27 +262,27 @@ class TwoChannelTwoStageDetector(BaseDetector):
         return batch_data_samples
 
 
-@MODELS.register_module()
-class TwoChannelFasterRCNN(TwoChannelTwoStageDetector):
-    """Implementation of `Faster R-CNN <https://arxiv.org/abs/1506.01497>`_"""
+# @MODELS.register_module()
+# class TwoStreamFasterRCNN(TwoStreamTwoStageDetector):
+#     """Implementation of `Faster R-CNN <https://arxiv.org/abs/1506.01497>`_"""
 
-    def __init__(self,
-                 backbone: ConfigType,
-                 fusion_layers: ConfigType,
-                 rpn_head: ConfigType,
-                 roi_head: ConfigType,
-                 train_cfg: ConfigType,
-                 test_cfg: ConfigType,
-                 neck: OptConfigType = None,
-                 data_preprocessor: OptConfigType = None,
-                 init_cfg: OptMultiConfig = None) -> None:
-        super().__init__(
-            backbone=backbone,
-            fusion_layers=fusion_layers,
-            neck=neck,
-            rpn_head=rpn_head,
-            roi_head=roi_head,
-            train_cfg=train_cfg,
-            test_cfg=test_cfg,
-            init_cfg=init_cfg,
-            data_preprocessor=data_preprocessor)
+#     def __init__(self,
+#                  backbone: ConfigType,
+#                  fusion_layers: ConfigType,
+#                  rpn_head: ConfigType,
+#                  roi_head: ConfigType,
+#                  train_cfg: ConfigType,
+#                  test_cfg: ConfigType,
+#                  neck: OptConfigType = None,
+#                  data_preprocessor: OptConfigType = None,
+#                  init_cfg: OptMultiConfig = None) -> None:
+#         super().__init__(
+#             backbone=backbone,
+#             fusion_layers=fusion_layers,
+#             neck=neck,
+#             rpn_head=rpn_head,
+#             roi_head=roi_head,
+#             train_cfg=train_cfg,
+#             test_cfg=test_cfg,
+#             init_cfg=init_cfg,
+#             data_preprocessor=data_preprocessor)

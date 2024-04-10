@@ -1,7 +1,7 @@
 _base_ = '../configs/faster_rcnn/faster-rcnn_r50_fpn_1x_coco.py'
 
 custom_imports = dict(
-    imports=['user_src.train_two_channel_pipeline', 'user_src.two_channel_data_preprocessor', 'user_src.two_channel_faster_rcnn', 'user_src.custom_hooks', 'user_src.custom_evaluator', 'user_src.custom_models'], allow_failed_imports=False)
+    imports=['user_src.train_two_stream_pipeline', 'user_src.two_stream_data_preprocessor', 'user_src.two_stream_faster_rcnn', 'user_src.custom_hooks', 'user_src.custom_evaluator', 'user_src.custom_models'], allow_failed_imports=False)
 
 image_size=(640, 640)
 dataset_type = 'CocoDataset'

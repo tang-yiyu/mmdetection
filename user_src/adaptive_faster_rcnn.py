@@ -158,12 +158,12 @@ class AdaptiveModel(BaseDetector):
         batch_inputs_rgb = batch_inputs[:, :3, :, :]
         batch_inputs_ir = batch_inputs[:, 3:, :, :]
 
-        # features_rgb = self.feature_rgb(batch_inputs_rgb)
-        # features_ir = self.feature_ir(batch_inputs_ir)
-        # decisions = self.policy_net(features_rgb[0], features_ir[0])
-        # batch_inputs_rgb = self.judge(decisions[0], batch_inputs_rgb)
-        # batch_inputs_ir = self.judge(decisions[1], batch_inputs_ir)
-        decisions = torch.tensor([[0., 1.], [1., 1.]], device=batch_inputs_rgb.device)
+        features_rgb = self.feature_rgb(batch_inputs_rgb)
+        features_ir = self.feature_ir(batch_inputs_ir)
+        decisions = self.policy_net(features_rgb[0], features_ir[0])
+        batch_inputs_rgb = self.judge(decisions[0], batch_inputs_rgb)
+        batch_inputs_ir = self.judge(decisions[1], batch_inputs_ir)
+        # decisions = torch.tensor([[0., 1.], [1., 1.]], device=batch_inputs_rgb.device)
 
         x_rgb = self.backbone_rgb(batch_inputs_rgb)
         x_ir = self.backbone_ir(batch_inputs_ir)

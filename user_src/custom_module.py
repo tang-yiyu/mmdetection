@@ -1,42 +1,45 @@
-import warnings
-from typing import Sequence
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from mmdet.registry import MODELS
-from mmdet.models.backbones.resnet import ResNet
-from mmcv.cnn import VGG, ConvModule
-from mmengine.model import BaseModule
+from mmcv.cnn import ConvModule
 
-
-
-class PolcyNet(nn.Module):
+class PolicyNet(nn.Module):
     def __init__(self,
-                 in_channels=2560,
+                 in_channels,
+                 out_feature_c=2048,
                  dimension=1
                  ):
         super().__init__()
 
-        self.out_feature_c = 2048
+        self.out_feature_c = out_feature_c
         self.temperature = 5.0
+        self.decay_ratio = 0.965
         self.d = dimension
         self.layers = []
+
+        avgpool_rgb = nn.AdaptiveAvgPool2d((1, 1))
+        self.add_module('avgpool_rgb', avgpool_rgb)
+        self.layers.append(avgpool_rgb)
+
+        avgpool_ir = nn.AdaptiveAvgPool2d((1, 1))
+        self.add_module('avgpool_ir', avgpool_ir)
+        self.layers.append(avgpool_ir)
         
         joint_net = nn.Sequential(
             nn.Linear(in_channels, self.out_feature_c), nn.ReLU(True),
             nn.Linear(self.out_feature_c, self.out_feature_c), nn.ReLU(True)
         )
         self.add_module('joint_net', joint_net)
-        self.layers.append('joint_net')
+        self.layers.append(joint_net)
 
         fc_rgb = nn.Linear(self.out_feature_c, 2)
         self.add_module('fc_rgb', fc_rgb)
-        self.layers.append('fc_rgb')
+        self.layers.append(fc_rgb)
 
         fc_ir = nn.Linear(self.out_feature_c, 2)
         self.add_module('fc_ir', fc_ir)
-        self.layers.append('fc_ir')
+        self.layers.append(fc_ir)
         
     def wrapper_gumbel_softmax(self, logits):
         """
@@ -48,18 +51,31 @@ class PolcyNet(nn.Module):
         return decisions
     
     def forward(self, x_rgb, x_ir):
+        x_rgb = self.layers[0](x_rgb)
+        x_rgb = x_rgb.view(x_rgb.size(0), x_rgb.size(1), -1)
+
+        x_ir = self.layers[1](x_ir)
+        x_ir = x_ir.view(x_ir.size(0), x_rgb.size(1), -1)
+
         x = torch.cat([x_rgb, x_ir], dim=self.d) # 将将x列表中的所有张量沿着列连接起来（通道数相加）
         x = x.view(x.size(0), -1) # 将张量的形状进行reshape，便于后续全连接层的处理
-        x = self.layers['joint_net'](x) # 全连接层
+        x = self.layers[2](x) # 全连接层
 
-        logits = [self.layers['fc_rgb'](x), self.layers['fc_ir'](x)]
+        logits = [self.layers[3](x), self.layers[4](x)]
         logits = torch.cat(logits, dim=0)
         # print("Current temperature: {}".format(self.temperature), flush=True)
         decisions = self.wrapper_gumbel_softmax(logits)
         decisions = decisions.view(2, -1) # Modality x Batchsize
         
         return decisions
+    
+    def set_temperature(self, temperature):
+        self.temperature = temperature
 
+    def decay_temperature(self, decay_ratio=None):
+        dr = decay_ratio if decay_ratio else self.decay_ratio
+        if dr:
+            self.temperature *= dr 
 
 class Bottleneck(nn.Module):
     # Standard bottleneck
@@ -129,105 +145,45 @@ class CrossConv(nn.Module):
 @MODELS.register_module()
 class FusionLayer(nn.Module):
     def __init__(self,
-                 num_stages=4,
-                 out_indices=(0, 1, 2, 3),
-                 base_channels=64,
-                 channel_weight=4,
+                 num_outs = 3,
+                 out_channels = 256,
                  fusion_pattern='C3'):
         super().__init__()
-        self.num_stages = num_stages
-        self.base_channels = base_channels
-        self.channel_weight = channel_weight
+        self.num_outs = num_outs
         self.fusion_layers = []
-        for i in range(self.num_stages):
-            channels = self.base_channels * 2**i  if i < 4 else 512
-            if i in out_indices:
-                if fusion_pattern == 'Conv':
-                    fusion_layer = ConvModule(in_channels=int(channels * self.channel_weight * 2),
-                              out_channels=int(channels * self.channel_weight),
-                              kernel_size=1)
-                elif fusion_pattern == 'ConvConv':
-                    fusion_layer = CrossConv(
-                        in_channels=int(channels * self.channel_weight * 2),
-                        out_channels=int(channels * self.channel_weight),
-                        shortcut=False,
-                        e=1.5)
-                elif fusion_pattern == 'Cross':
-                    fusion_layer = CrossConv(
-                        in_channels=int(channels * self.channel_weight * 2),
-                        out_channels=int(channels * self.channel_weight),
-                        shortcut=True,
-                        e=1.0)
-                elif fusion_pattern == 'C3':
-                    fusion_layer = C3(
-                        in_channels=int(channels * self.channel_weight * 2),
-                        out_channels=int(channels * self.channel_weight),
-                        n=1,
-                        shortcut=True,
-                        e=0.5)
-                else:
-                    raise NotImplementedError
-                fusion_layer_name = f'layer{i + 1}_fusion'
-                self.add_module(fusion_layer_name, fusion_layer)
-                self.fusion_layers.append(fusion_layer)
+        for i in range(self.num_outs):
+            if fusion_pattern == 'Conv':
+                fusion_layer = ConvModule(
+                    in_channels=int(out_channels * 2),
+                    out_channels=out_channels,
+                    kernel_size=1)
+            elif fusion_pattern == 'ConvConv':
+                fusion_layer = CrossConv(
+                    in_channels=int(out_channels * 2),
+                    out_channels=out_channels,
+                    shortcut=False,
+                    e=1.5)
+            elif fusion_pattern == 'Cross':
+                fusion_layer = CrossConv(
+                    in_channels=int(out_channels * 2),
+                    out_channels=out_channels,
+                    shortcut=True,
+                    e=1.0)
+            elif fusion_pattern == 'C3':
+                fusion_layer = C3(
+                    in_channels=int(out_channels * 2),
+                    out_channels=out_channels,
+                    n=1,
+                    shortcut=True,
+                    e=0.5)
+            else:
+                raise NotImplementedError
+            fusion_layer_name = f'layer{i + 1}_fusion'
+            self.add_module(fusion_layer_name, fusion_layer)
+            self.fusion_layers.append(fusion_layer)
         
     def forward(self, x, index):
         x = self.fusion_layers[index](x)
         return x
     
-
-@MODELS.register_module()
-class VGG16(VGG, BaseModule):
-    """
-    Notice: If with_bn=False, checkpoint='torchvision://vgg16'. If with_bn=True, checkpoint='torchvision://vgg16_bn'.
-    Reference website: https://mmclassification.readthedocs.io/en/latest/model_zoo.html#imagenet
-    """
-    def __init__(self,
-                 depth: int,
-                 with_bn: bool = False,
-                 num_classes: int = -1,
-                 num_stages: int = 5,
-                 dilations: Sequence[int] = (1, 1, 1, 1, 1),
-                 out_indices: Sequence[int] = (0, 1, 2, 3, 4),
-                 frozen_stages: int = -1,
-                 bn_eval: bool = True,
-                 bn_frozen: bool = False,
-                 ceil_mode: bool = False,
-                 with_last_pool: bool = True,
-                 pretrained=None,
-                 init_cfg=None,
-                 ):
-        super(VGG16, self).__init__(depth=depth,
-                                    with_bn=with_bn,
-                                    num_classes=num_classes,
-                                    num_stages=num_stages,
-                                    dilations=dilations,
-                                    out_indices=out_indices,
-                                    frozen_stages=frozen_stages,
-                                    bn_eval=bn_eval,
-                                    bn_frozen=bn_frozen,
-                                    ceil_mode=ceil_mode,
-                                    with_last_pool=with_last_pool)
-
-        assert not (init_cfg and pretrained), \
-            'init_cfg and pretrained cannot be specified at the same time'
-
-        if init_cfg is not None:
-            self.init_cfg = init_cfg
-        elif isinstance(pretrained, str):
-            warnings.warn('DeprecationWarning: pretrained is deprecated, '
-                          'please use "init_cfg" instead')
-            self.init_cfg = dict(type='Pretrained', checkpoint=pretrained)
-        elif pretrained is None:
-            self.init_cfg = [
-                dict(type='Kaiming', layer='Conv2d'),
-                dict(type='Constant', val=1, layer='BatchNorm2d'),
-                dict(type='Normal', std=0.01, layer='Linear'),
-            ]
-        else:
-            raise TypeError('pretrained must be a str or None')
-    
-    def init_weights(self, pretrained=None):
-        super(VGG, self).init_weights()
-
 

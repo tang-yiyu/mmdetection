@@ -1,5 +1,15 @@
 _base_ = './kaist_faster-rcnn_r50_fpn_1x_coco.py'
 
+custom_imports = dict(
+    imports=['user_src.train_two_stream_pipeline', 
+             'user_src.two_stream_data_preprocessor', 
+             'user_src.two_stream_faster_rcnn', 
+             'user_src.custom_hooks', 
+             'user_src.custom_evaluator', 
+             'user_src.custom_module',
+             'user_src.custom_backbone'], 
+    allow_failed_imports=False)
+
 work_dir = './work_dirs/kaist_bmvc_conv_faster-rcnn_v16_fpn_1x_coco/'
 
 model = dict(

@@ -1,49 +1,23 @@
 import os.path as osp
 import mmcv
 
-from typing import Sequence
+from typing import Sequence, Optional, Union
 
 from mmengine.runner import Runner
 from mmengine.hooks import Hook
 from mmengine.utils import mkdir_or_exist
 from mmengine.fileio import get
+from mmengine.model.wrappers import is_model_wrapper
 
 from mmdet.registry import HOOKS
 from mmdet.engine.hooks.visualization_hook import DetVisualizationHook
 from mmdet.structures import DetDataSample
 
+DATA_BATCH = Optional[Union[dict, tuple, list]]
+
 
 @HOOKS.register_module()
 class TwoStreamDetVisualizationHook(DetVisualizationHook):
-    """Detection Visualization Hook. Used to visualize validation and testing
-    process prediction results.
-
-    In the testing phase:
-
-    1. If ``show`` is True, it means that only the prediction results are
-        visualized without storing data, so ``vis_backends`` needs to
-        be excluded.
-    2. If ``test_out_dir`` is specified, it means that the prediction results
-        need to be saved to ``test_out_dir``. In order to avoid vis_backends
-        also storing data, so ``vis_backends`` needs to be excluded.
-    3. ``vis_backends`` takes effect if the user does not specify ``show``
-        and `test_out_dir``. You can set ``vis_backends`` to WandbVisBackend or
-        TensorboardVisBackend to store the prediction result in Wandb or
-        Tensorboard.
-
-    Args:
-        draw (bool): whether to draw prediction results. If it is False,
-            it means that no drawing will be done. Defaults to False.
-        interval (int): The interval of visualization. Defaults to 50.
-        score_thr (float): The threshold to visualize the bboxes
-            and masks. Defaults to 0.3.
-        show (bool): Whether to display the drawn image. Default to False.
-        wait_time (float): The interval of show (s). Defaults to 0.
-        test_out_dir (str, optional): directory where painted images
-            will be saved in testing process.
-        backend_args (dict, optional): Arguments to instantiate the
-            corresponding backend. Defaults to None.
-    """
 
     def after_val_iter(self, runner: Runner, batch_idx: int, data_batch: dict,
                        outputs: Sequence[DetDataSample]) -> None:
@@ -176,3 +150,131 @@ class TwoStreamDetVisualizationHook(DetVisualizationHook):
                 out_file=out_file_ir,
                 step=self._test_index)
 
+
+@HOOKS.register_module()
+class AdjustModeHook(Hook):
+
+    def freeze_policy_net(self):
+        self.model.update_policy_net = False
+        for param in self.model.feature_rgb.parameters():
+            param.requires_grad = False
+
+        for param in self.model.feature_ir.parameters():
+            param.requires_grad = False
+
+        for param in self.model.policy_net.parameters():
+            param.requires_grad = False
+
+        for policy_layer in self.model.policy_layers:
+            for param in policy_layer.parameters():
+                param.requires_grad = False
+
+    def unfreeze_policy_net(self):
+        self.model.update_policy_net = True
+        for param in self.model.feature_rgb.parameters():
+            param.requires_grad = True
+
+        for param in self.model.feature_ir.parameters():
+            param.requires_grad = True
+
+        for param in self.model.policy_net.parameters():
+            param.requires_grad = True
+            
+        for policy_layer in self.model.policy_layers:
+            for param in policy_layer.parameters():
+                param.requires_grad = True
+
+    def freeze_main_net(self):
+        self.model.update_main_net = False
+        for param in self.model.backbone_rgb.parameters():
+            param.requires_grad = False
+        
+        for param in self.model.backbone_ir.parameters():
+            param.requires_grad = False
+
+        for param in self.model.neck_rgb.parameters():
+            param.requires_grad = False
+
+        for param in self.model.neck_ir.parameters():
+            param.requires_grad = False
+        
+        for param in self.model.fusion_layers.parameters():
+            param.requires_grad = False
+
+        for param in self.model.rpn_head.parameters():
+            param.requires_grad = False
+
+        for param in self.model.roi_head.parameters():
+            param.requires_grad = False
+
+    def unfreeze_main_net(self):
+        self.model.update_main_net = True
+        for param in self.model.backbone_rgb.parameters():
+            param.requires_grad = True
+        
+        for param in self.model.backbone_ir.parameters():
+            param.requires_grad = True
+
+        for param in self.model.neck_rgb.parameters():
+            param.requires_grad = True
+
+        for param in self.model.neck_ir.parameters():
+            param.requires_grad = True
+
+        for param in self.model.fusion_layers.parameters():
+            param.requires_grad = True
+
+        for param in self.model.rpn_head.parameters():
+            param.requires_grad = True
+
+        for param in self.model.roi_head.parameters():
+            param.requires_grad = True
+
+    def before_train_iter(self,
+                          runner,
+                          batch_idx: int,
+                          data_batch: DATA_BATCH = None) -> None:
+        epoch = runner.epoch
+        self.model = runner.model
+        if is_model_wrapper(self.model):
+            self.model = self.model.module
+
+        warmup_epoch = 0
+        prepare_epoch = warmup_epoch + 5
+        alternate_epoch = epoch - 15
+
+        # Warm up training
+        if epoch == 0 and epoch != warmup_epoch:
+            print("Warmup Training")
+
+        # Prepare training
+        elif epoch == warmup_epoch:
+            print("Prepare Training")
+            self.freeze_policy_net()
+            self.unfreeze_main_net()
+            # for k,v in self.model.named_parameters():
+            #     print('{}: {}'.format(k, v.requires_grad))
+            # print('Done!')
+
+        # Alternate training
+        elif prepare_epoch <= epoch < alternate_epoch:
+            print("Alternate Training")
+            if (epoch - prepare_epoch) % 10 == 0:
+                print("Update PolicyNet")
+                self.unfreeze_policy_net()
+                self.freeze_main_net()
+                if epoch > prepare_epoch:
+                    self.model.policy_net.decay_temperature(0.85)
+                    for policy_layer in self.model.policy_layers:
+                        policy_layer.decay_temperature(0.85)
+            elif ((epoch - prepare_epoch) % 5 == 0) and ((epoch - prepare_epoch) % 10 != 0):
+                print("Update MainNet")
+                self.freeze_policy_net()
+                self.unfreeze_main_net()
+        
+        # Finetune training
+        elif epoch == alternate_epoch:
+            print("Finetune Training")
+            self.freeze_policy_net()
+            self.unfreeze_main_net()
+            

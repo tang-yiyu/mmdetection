@@ -38,7 +38,8 @@ class TwoStreamFasterRCNN(BaseDetector):
         self.fusion_layers = MODELS.build(fusion_layers)
 
         if neck is not None:
-            self.neck = MODELS.build(neck)
+            self.neck_rgb = MODELS.build(neck)
+            self.neck_ir = MODELS.build(neck)
 
         if rpn_head is not None:
             rpn_train_cfg = train_cfg.rpn if train_cfg is not None else None
@@ -92,6 +93,11 @@ class TwoStreamFasterRCNN(BaseDetector):
                                       error_msgs)
 
     @property
+    def with_neck(self) -> bool:
+        """bool: whether the detector has a neck"""
+        return hasattr(self, 'neck_rgb') and hasattr(self, 'neck_ir') and self.neck_rgb and self.neck_ir is not None
+
+    @property
     def with_rpn(self) -> bool:
         """bool: whether the detector has RPN"""
         return hasattr(self, 'rpn_head') and self.rpn_head is not None
@@ -120,15 +126,23 @@ class TwoStreamFasterRCNN(BaseDetector):
         if len(x_rgb) != len(x_ir):
             raise ValueError('The length of rgb feature and ir feature should be the same.')
 
-        x = []
-        for i in range(len(x_rgb)):
-            out = torch.cat((x_rgb[i], x_ir[i]), dim=1)
-            out = self.fusion_layers(out, i)
-            x.append(out)
-        x = tuple(x)
+        # x = []
+        # for i in range(len(x_rgb)):
+        #     out = torch.cat((x_rgb[i], x_ir[i]), dim=1)
+        #     out = self.fusion_layers(out, i)
+        #     x.append(out)
+        # x = tuple(x)
 
         if self.with_neck:
-            x = self.neck(x)
+            x_rgb = self.neck_rgb(x_rgb)
+            x_ir = self.neck_ir(x_ir)
+            x = []
+            for i in range(len(x_rgb)):
+                out = torch.cat((x_rgb[i], x_ir[i]), dim=1)
+                out = self.fusion_layers(out, i)
+                x.append(out)
+            x = tuple(x)
+        
         return x
 
     def _forward(self, batch_inputs: Tensor,
@@ -260,29 +274,3 @@ class TwoStreamFasterRCNN(BaseDetector):
         batch_data_samples = self.add_pred_to_datasample(
             batch_data_samples, results_list)
         return batch_data_samples
-
-
-# @MODELS.register_module()
-# class TwoStreamFasterRCNN(TwoStreamTwoStageDetector):
-#     """Implementation of `Faster R-CNN <https://arxiv.org/abs/1506.01497>`_"""
-
-#     def __init__(self,
-#                  backbone: ConfigType,
-#                  fusion_layers: ConfigType,
-#                  rpn_head: ConfigType,
-#                  roi_head: ConfigType,
-#                  train_cfg: ConfigType,
-#                  test_cfg: ConfigType,
-#                  neck: OptConfigType = None,
-#                  data_preprocessor: OptConfigType = None,
-#                  init_cfg: OptMultiConfig = None) -> None:
-#         super().__init__(
-#             backbone=backbone,
-#             fusion_layers=fusion_layers,
-#             neck=neck,
-#             rpn_head=rpn_head,
-#             roi_head=roi_head,
-#             train_cfg=train_cfg,
-#             test_cfg=test_cfg,
-#             init_cfg=init_cfg,
-#             data_preprocessor=data_preprocessor)

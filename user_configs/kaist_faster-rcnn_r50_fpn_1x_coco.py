@@ -1,33 +1,38 @@
 _base_ = '../configs/faster_rcnn/faster-rcnn_r50_fpn_1x_coco.py'
 
 custom_imports = dict(
-    imports=['user_src.train_two_stream_pipeline', 'user_src.two_stream_data_preprocessor', 'user_src.two_stream_faster_rcnn', 'user_src.custom_hooks', 'user_src.custom_evaluator', 'user_src.custom_models'], allow_failed_imports=False)
+    imports=['user_src.train_two_stream_pipeline', 
+             'user_src.two_stream_data_preprocessor', 
+             'user_src.two_stream_faster_rcnn', 
+             'user_src.custom_hooks', 
+             'user_src.custom_evaluator', 
+             'user_src.custom_module'], 
+    allow_failed_imports=False)
 
-image_size=(640, 640)
+image_size=(640, 512)
 dataset_type = 'CocoDataset'
 classes = ('person')
-data_root='data/kaist_onlyperson/'
-work_dir = './work_dirs/kaist_onlyperson_C3_faster-rcnn_r50_fpn_1x_coco2/'
+data_root='data/BMVC/'
+work_dir = './work_dirs/kaist_BMVC_trans4_faster-rcnn_r50_fpn_1x_coco/'
 
 default_hooks = dict(
     checkpoint=dict(interval=1, save_best='coco/bbox_mAP_50', rule='greater', type='CheckpointHook'),
     visualization=dict(type='TwoStreamDetVisualizationHook'))
 
 model = dict(
-    fusion_layers=dict(
-        type='FusionLayer',
-        num_stages=4,
-        out_indices=(0, 1, 2, 3),
-        base_channels=64,
-        channel_weight=4,
-        fusion_pattern='C3'),
     data_preprocessor=dict(
         type='TwoStreamDetDataPreprocessor'),
     neck=dict(
         num_outs=3,
         end_level=2),
+    fusion_layers=dict(
+        type='FusionLayer',
+        num_outs=3,
+        out_channels=256,
+        fusion_pattern='Conv'),
     roi_head=dict(
         bbox_head=dict(
+            loss_bbox=dict(loss_weight=1.0, type='SmoothL1Loss'),
             num_classes=1)),
     rpn_head=dict(
         anchor_generator=dict(
@@ -43,7 +48,8 @@ model = dict(
                 8,
                 16,
             ],
-            type='AnchorGenerator')),
+            type='AnchorGenerator'),
+        loss_bbox=dict(loss_weight=1.0, type='SmoothL1Loss'),),
     test_cfg=dict(
         rcnn=dict(
             max_per_img=100,
@@ -63,13 +69,13 @@ train_pipeline = [
         resize_type='ResizeTwoStream',
         keep_ratio=True),
     # dict(keep_ratio=True, scale=image_size, type='ResizeTwoStream'),
-    dict(
-        type='RandomCropTwoStream',
-        crop_type='absolute_range',
-        crop_size=image_size,
-        recompute_bbox=True,
-        allow_negative_crop=True),
-    dict(type='RandomErasingTwoStream', n_patches=(1, 5), ratio=(0, 0.2)),
+    # dict(
+    #     type='RandomCropTwoStream',
+    #     crop_type='absolute_range',
+    #     crop_size=(384, 480),
+    #     recompute_bbox=True,
+    #     allow_negative_crop=True),
+    dict(type='RandomErasingTwoStream', n_patches=(1, 5), ratio=(0.02, 0.2), squared=False),
     dict(prob=0.5, type='RandomFlipTwoStream'),
     dict(type='PackDetInputsTwoStream'),
 ]
@@ -92,10 +98,7 @@ val_evaluator = dict(
 
 val_pipeline = [
     dict(backend_args=None, type='LoadTwoStreamImageFromFiles'),
-    dict(keep_ratio=True, scale=(
-        1333,
-        800,
-    ), type='ResizeTwoStream'),
+    dict(keep_ratio=True, scale=image_size, type='ResizeTwoStream'),
     dict(type='LoadAnnotations', with_bbox=True),
     dict(
         meta_keys=(
@@ -127,10 +130,7 @@ test_evaluator = dict(
 
 test_pipeline = [
     dict(backend_args=None, type='LoadTwoStreamImageFromFiles'),
-    dict(keep_ratio=True, scale=(
-        1333,
-        800,
-    ), type='ResizeTwoStream'),
+    dict(keep_ratio=True, scale=image_size, type='ResizeTwoStream'),
     dict(type='LoadAnnotations', with_bbox=True),
     dict(
         meta_keys=(

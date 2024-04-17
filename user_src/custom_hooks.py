@@ -230,10 +230,7 @@ class AdjustModeHook(Hook):
         for param in self.model.roi_head.parameters():
             param.requires_grad = True
 
-    def before_train_iter(self,
-                          runner,
-                          batch_idx: int,
-                          data_batch: DATA_BATCH = None) -> None:
+    def before_train_epoch(self, runner) -> None:
         epoch = runner.epoch
         self.model = runner.model
         if is_model_wrapper(self.model):

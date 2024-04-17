@@ -324,7 +324,7 @@ class TwoStreamDetDataPreprocessor(TwoStreamImgDataPreprocessor):
         
         # print('inputs_rgb: ', inputs_rgb.shape)
 
-        inputs = torch.concat([inputs_rgb, inputs_ir], dim=1)
+        inputs = torch.cat([inputs_rgb, inputs_ir], dim=1)
         
         # print('inputs: ', inputs.shape)
         # inputs_rgb_1 = inputs[:, :3, :, :]

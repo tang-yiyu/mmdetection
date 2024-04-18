@@ -236,42 +236,44 @@ class AdjustModeHook(Hook):
         if is_model_wrapper(self.model):
             self.model = self.model.module
 
-        warmup_epoch = 0
+        warmup_epoch = 5
         prepare_epoch = warmup_epoch + 5
         alternate_epoch = epoch - 15
 
-        # Warm up training
-        if epoch == 0 and epoch != warmup_epoch:
-            print("Warmup Training")
+        if self.every_n_epochs(runner, 1, 0):
+            # Warm up training
+            if epoch == 0 and epoch != warmup_epoch:
+                print("Warmup Training")
 
-        # Prepare training
-        elif epoch == warmup_epoch:
-            print("Prepare Training")
-            self.freeze_policy_net()
-            self.unfreeze_main_net()
-            # for k,v in self.model.named_parameters():
-            #     print('{}: {}'.format(k, v.requires_grad))
-            # print('Done!')
-
-        # Alternate training
-        elif prepare_epoch <= epoch < alternate_epoch:
-            print("Alternate Training")
-            if (epoch - prepare_epoch) % 10 == 0:
-                print("Update PolicyNet")
-                self.unfreeze_policy_net()
-                self.freeze_main_net()
-                if epoch > prepare_epoch:
-                    self.model.policy_net.decay_temperature(0.85)
-                    for policy_layer in self.model.policy_layers:
-                        policy_layer.decay_temperature(0.85)
-            elif ((epoch - prepare_epoch) % 5 == 0) and ((epoch - prepare_epoch) % 10 != 0):
-                print("Update MainNet")
+            # Prepare training
+            elif epoch == warmup_epoch:
+                print("Prepare Training")
                 self.freeze_policy_net()
                 self.unfreeze_main_net()
-        
-        # Finetune training
-        elif epoch == alternate_epoch:
-            print("Finetune Training")
-            self.freeze_policy_net()
-            self.unfreeze_main_net()
+                # for k,v in self.model.named_parameters():
+                #     print('{}: {}'.format(k, v.requires_grad))
+                # print('Done!')
+
+            # Alternate training
+            elif prepare_epoch <= epoch < alternate_epoch:
+                if epoch == prepare_epoch:
+                    print("Alternate Training")
+                if (epoch - prepare_epoch) % 10 == 0:
+                    print("Update PolicyNet")
+                    self.unfreeze_policy_net()
+                    self.freeze_main_net()
+                    if epoch > prepare_epoch:
+                        self.model.policy_net.decay_temperature(0.85)
+                        for policy_layer in self.model.policy_layers:
+                            policy_layer.decay_temperature(0.85)
+                elif ((epoch - prepare_epoch) % 5 == 0) and ((epoch - prepare_epoch) % 10 != 0):
+                    print("Update MainNet")
+                    self.freeze_policy_net()
+                    self.unfreeze_main_net()
+            
+            # Finetune training
+            elif epoch == alternate_epoch:
+                print("Finetune Training")
+                self.freeze_policy_net()
+                self.unfreeze_main_net()
             

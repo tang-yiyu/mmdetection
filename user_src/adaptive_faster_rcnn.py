@@ -13,10 +13,6 @@ from mmdet.models.detectors.base import BaseDetector
 
 from user_src.custom_module import  PolicyNet
 
-from mmdet.models.backbones.mobilenet_v2 import MobileNetV2
-
-
-
 @MODELS.register_module()
 class AdaptiveModel(BaseDetector):
     """Base class for two-stage detectors.
@@ -29,6 +25,7 @@ class AdaptiveModel(BaseDetector):
                  backbone: ConfigType,
                  feature_layers: ConfigType,
                  fusion_layers: ConfigType,
+                 loss_policy:ConfigType,
                  neck: OptConfigType = None,
                  rpn_head: OptConfigType = None,
                  roi_head: OptConfigType = None,
@@ -87,6 +84,8 @@ class AdaptiveModel(BaseDetector):
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
 
+        self.loss_policy = MODELS.build(loss_policy)
+
         self.update_policy_net = True
         self.update_main_net = True
 
@@ -137,6 +136,11 @@ class AdaptiveModel(BaseDetector):
         for i in range(input.shape[0]):
             output[i, :, :, :] = decision[i] * input[i, :, :, :]
         return output
+
+    def compute_policy_loss(self, decisions_set, losses):
+        policy_losses = self.loss_policy(decisions_set, losses)
+        return dict(
+            loss_policy=policy_losses)
 
     def extract_feat(self, batch_inputs: Tensor) -> Tuple[Tensor]:
         """Extract features.
@@ -288,26 +292,11 @@ class AdaptiveModel(BaseDetector):
 
         if self.update_policy_net == True:
             policy_losses = self.compute_policy_loss(decisions_set, losses)
-            losses.update(policy_losses)
+        elif self.update_policy_net == False:
+            policy_losses = 0.0
+        losses.update(policy_losses)
 
         return losses
-
-    def compute_policy_loss(self, decisions_set, losses):
-        policy_losses = []
-        cost_weights = [1.0, 1.0] # The weight of each stream
-        gammas = 0.8 # Penalize incorrect predictions
-        policy_weight = 0.4
-        incorrectness = losses['loss_cls'] + losses['loss_bbox']
-        correctness = torch.ones_like(incorrectness) - incorrectness
-        for decisions in decisions_set:
-            policy_loss = torch.tensor(0.0, dtype=decisions.dtype, device=decisions.device)
-            for w, pl in zip(cost_weights, decisions.chunk(chunks=2, dim=0)):
-                loss = w * torch.mean(correctness * pl)
-                policy_loss = policy_loss + loss
-            policy_loss = policy_loss + torch.mean(incorrectness * gammas)
-            policy_losses.append(policy_loss * policy_weight)
-        return dict(
-            loss_policy=policy_losses)
 
     def predict(self,
                 batch_inputs: Tensor,

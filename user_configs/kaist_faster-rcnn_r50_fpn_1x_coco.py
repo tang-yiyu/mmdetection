@@ -54,7 +54,7 @@ model = dict(
         rcnn=dict(
             max_per_img=100,
             nms=dict(iou_threshold=0.5, type='nms'),
-            score_thr=0.001)),
+            score_thr=0.0001)),
     type='TwoStreamFasterRCNN')
 
 train_cfg = dict(max_epochs=20, type='EpochBasedTrainLoop', val_interval=1)

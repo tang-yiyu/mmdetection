@@ -238,7 +238,7 @@ class AdjustModeHook(Hook):
 
         warmup_epoch = 5
         prepare_epoch = warmup_epoch + 5
-        alternate_epoch = epoch - 15
+        alternate_epoch = runner.max_epochs - 15
 
         if self.every_n_epochs(runner, 1, 0):
             # Warm up training

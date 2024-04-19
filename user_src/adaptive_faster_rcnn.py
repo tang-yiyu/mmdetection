@@ -292,9 +292,7 @@ class AdaptiveModel(BaseDetector):
 
         if self.update_policy_net == True:
             policy_losses = self.compute_policy_loss(decisions_set, losses)
-        elif self.update_policy_net == False:
-            policy_losses = 0.0
-        losses.update(policy_losses)
+            losses.update(policy_losses)
 
         return losses
 

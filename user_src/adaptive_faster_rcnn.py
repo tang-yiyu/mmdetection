@@ -178,14 +178,8 @@ class AdaptiveModel(BaseDetector):
         if self.with_neck:
             x_rgb = self.neck_rgb(x_rgb)
             x_ir = self.neck_ir(x_ir)
-            x_fuse = []
-            for i in range(len(x_rgb)):
-                out = torch.cat((x_rgb[i], x_ir[i]), dim=1)
-                out = self.fusion_layers(out, i)
-                x_fuse.append(out)
-            x_fuse = tuple(x_fuse)
         
-        return x_fuse, x_rgb, x_ir, decisions
+        return x_rgb, x_ir, decisions
 
     def _forward(self, batch_inputs: Tensor,
                  batch_data_samples: SampleList) -> tuple:
@@ -203,7 +197,14 @@ class AdaptiveModel(BaseDetector):
             forward.
         """
         results = ()
-        x_fuse, x_rgb, x_ir, _ = self.extract_feat(batch_inputs)
+        x_rgb, x_ir, _ = self.extract_feat(batch_inputs)
+
+        x_fuse = []
+        for i in range(len(x_rgb)):
+            out = torch.cat((x_rgb[i], x_ir[i]), dim=1)
+            out = self.fusion_layers(out, i)
+            x_fuse.append(out)
+        x_fuse = tuple(x_fuse)
 
         if self.with_rpn:
             rpn_results_list = self.rpn_head.predict(
@@ -244,7 +245,14 @@ class AdaptiveModel(BaseDetector):
         Returns:
             dict: A dictionary of loss components
         """
-        x_fuse, x_rgb, x_ir, decisions = self.extract_feat(batch_inputs)
+        x_rgb, x_ir, decisions = self.extract_feat(batch_inputs)
+
+        x_fuse = []
+        for i in range(len(x_rgb)):
+            out = torch.cat((x_rgb[i], x_ir[i]), dim=1)
+            out = self.fusion_layers(out, i)
+            x_fuse.append(out)
+        x_fuse = tuple(x_fuse)
         
         decisions_set = []
         decisions_set.append(decisions)
@@ -329,7 +337,14 @@ class AdaptiveModel(BaseDetector):
         """
 
         assert self.with_bbox, 'Bbox head must be implemented.'
-        x_fuse, x_rgb, x_ir, _ = self.extract_feat(batch_inputs)
+        x_rgb, x_ir, _ = self.extract_feat(batch_inputs)
+
+        x_fuse = []
+        for i in range(len(x_rgb)):
+            out = torch.cat((x_rgb[i], x_ir[i]), dim=1)
+            out = self.fusion_layers(out, i)
+            x_fuse.append(out)
+        x_fuse = tuple(x_fuse)
 
         # If there are no pre-defined proposals, use RPN to get proposals
         if batch_data_samples[0].get('proposals', None) is None:

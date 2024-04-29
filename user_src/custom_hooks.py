@@ -258,7 +258,7 @@ class AdjustModeHook(Hook):
             elif prepare_epoch <= epoch < alternate_epoch:
                 if epoch == prepare_epoch:
                     print("Alternate Training")
-                if (epoch - prepare_epoch) % 10 == 0:
+                if (epoch - prepare_epoch) % 4 == 0:
                     print("Update PolicyNet")
                     self.unfreeze_policy_net()
                     self.freeze_main_net()
@@ -266,7 +266,7 @@ class AdjustModeHook(Hook):
                         self.model.policy_net.decay_temperature(0.85)
                         for policy_layer in self.model.policy_layers:
                             policy_layer.decay_temperature(0.85)
-                elif ((epoch - prepare_epoch) % 5 == 0) and ((epoch - prepare_epoch) % 10 != 0):
+                elif ((epoch - prepare_epoch) % 2 == 0) and ((epoch - prepare_epoch) % 4 != 0):
                     print("Update MainNet")
                     self.freeze_policy_net()
                     self.unfreeze_main_net()

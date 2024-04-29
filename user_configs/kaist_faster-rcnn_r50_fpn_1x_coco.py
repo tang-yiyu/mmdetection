@@ -12,8 +12,8 @@ custom_imports = dict(
 image_size=(640, 512)
 dataset_type = 'CocoDataset'
 classes = ('person')
-data_root='data/BMVC/'
-work_dir = './work_dirs/kaist_BMVC_trans4_faster-rcnn_r50_fpn_1x_coco/'
+data_root = 'data/kaist_onlyperson/'
+work_dir = './work_dirs/kaist_onlyperson_faster-rcnn_r50_fpn_1x_coco/'
 
 default_hooks = dict(
     checkpoint=dict(interval=1, save_best='coco/bbox_mAP_50', rule='greater', type='CheckpointHook'),
@@ -57,17 +57,15 @@ model = dict(
             score_thr=0.0001)),
     type='TwoStreamFasterRCNN')
 
+# optim_wrapper = dict(
+#     optimizer=dict(lr=0.01, momentum=0.9, type='SGD', weight_decay=0.0001),
+#     type='OptimWrapper')
+
 train_cfg = dict(max_epochs=20, type='EpochBasedTrainLoop', val_interval=1)
 
 train_pipeline = [
     dict(backend_args=None, type='LoadTwoStreamImageFromFiles'),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(
-        type='RandomResize',
-        scale=image_size,
-        ratio_range=(0.5, 2.0),
-        resize_type='ResizeTwoStream',
-        keep_ratio=True),
     # dict(keep_ratio=True, scale=image_size, type='ResizeTwoStream'),
     # dict(
     #     type='RandomCropTwoStream',
@@ -76,6 +74,12 @@ train_pipeline = [
     #     recompute_bbox=True,
     #     allow_negative_crop=True),
     dict(type='RandomErasingTwoStream', n_patches=(1, 5), ratio=(0.02, 0.2), squared=False),
+    dict(
+        type='RandomResize',
+        scale=image_size,
+        ratio_range=(0.5, 2.0),
+        resize_type='ResizeTwoStream',
+        keep_ratio=True),
     dict(prob=0.5, type='RandomFlipTwoStream'),
     dict(type='PackDetInputsTwoStream'),
 ]

@@ -11,7 +11,7 @@ from mmdet.structures import SampleList
 from mmdet.utils import ConfigType, OptConfigType, OptMultiConfig
 from mmdet.models.detectors.base import BaseDetector
 
-from user_src.custom_module import  PolicyNet
+from user_src.custom_module import  PolicyNet, ChannelAttention, SpatialAttention
 
 @MODELS.register_module()
 class AdaptiveModel(BaseDetector):
@@ -46,14 +46,24 @@ class AdaptiveModel(BaseDetector):
 
         self.fusion_layers = MODELS.build(fusion_layers)
 
+        # self.attention_layers = []
+        # for i in range(fusion_layers.num_outs):
+        #     attention_layer = nn.Sequential(ChannelAttention(2*fusion_layers.out_channels[i]),
+        #                                     SpatialAttention(),
+        #                                     nn.Dropout(0.1))
+        #     attention_layer_name = f'attention_layer{i}'
+        #     self.add_module(attention_layer_name, attention_layer)
+        #     self.attention_layers.append(attention_layer)
+
         if neck is not None:
             self.neck_rgb = MODELS.build(neck)
             self.neck_ir = MODELS.build(neck)
+            self.neck_fuse = MODELS.build(neck)
 
         self.policy_layers = []
         for i in range(neck.num_outs):
             policy_layer = PolicyNet(in_channels=512, out_feature_c = 256)
-            policy_layer_name = f'policy_layer{i}_fusion'
+            policy_layer_name = f'policy_layer{i}'
             self.add_module(policy_layer_name, policy_layer)
             self.policy_layers.append(policy_layer)
 
@@ -174,12 +184,23 @@ class AdaptiveModel(BaseDetector):
 
         if len(x_rgb) != len(x_ir):
             raise ValueError('The length of rgb feature and ir feature should be the same.')
+        
+        x_fuse = []
+        for i in range(len(x_rgb)):
+            # out = x_rgb[i] + x_ir[i]
+            out = torch.cat((x_rgb[i], x_ir[i]), dim=1)
+            # out = self.attention_layers[i](out)
+            out = self.fusion_layers(out, i)
+            # out = self.attention_layers[i](out)
+            x_fuse.append(out)
+        x_fuse = tuple(x_fuse)
 
         if self.with_neck:
             x_rgb = self.neck_rgb(x_rgb)
             x_ir = self.neck_ir(x_ir)
+            x_fuse = self.neck_fuse(x_fuse)
         
-        return x_rgb, x_ir, decisions
+        return x_rgb, x_ir, x_fuse, decisions
 
     def _forward(self, batch_inputs: Tensor,
                  batch_data_samples: SampleList) -> tuple:
@@ -197,14 +218,7 @@ class AdaptiveModel(BaseDetector):
             forward.
         """
         results = ()
-        x_rgb, x_ir, _ = self.extract_feat(batch_inputs)
-
-        x_fuse = []
-        for i in range(len(x_rgb)):
-            out = torch.cat((x_rgb[i], x_ir[i]), dim=1)
-            out = self.fusion_layers(out, i)
-            x_fuse.append(out)
-        x_fuse = tuple(x_fuse)
+        x_rgb, x_ir, x_fuse, _ = self.extract_feat(batch_inputs)
 
         if self.with_rpn:
             rpn_results_list = self.rpn_head.predict(
@@ -223,7 +237,6 @@ class AdaptiveModel(BaseDetector):
             out = out_rgb + out_ir
             x.append(out)
         x = tuple(x)
-
         roi_outs = self.roi_head.forward(x, rpn_results_list,
                                          batch_data_samples)
         results = results + (roi_outs, )
@@ -245,14 +258,7 @@ class AdaptiveModel(BaseDetector):
         Returns:
             dict: A dictionary of loss components
         """
-        x_rgb, x_ir, decisions = self.extract_feat(batch_inputs)
-
-        x_fuse = []
-        for i in range(len(x_rgb)):
-            out = torch.cat((x_rgb[i], x_ir[i]), dim=1)
-            out = self.fusion_layers(out, i)
-            x_fuse.append(out)
-        x_fuse = tuple(x_fuse)
+        x_rgb, x_ir, x_fuse, decisions = self.extract_feat(batch_inputs)
         
         decisions_set = []
         decisions_set.append(decisions)
@@ -337,14 +343,10 @@ class AdaptiveModel(BaseDetector):
         """
 
         assert self.with_bbox, 'Bbox head must be implemented.'
-        x_rgb, x_ir, _ = self.extract_feat(batch_inputs)
-
-        x_fuse = []
-        for i in range(len(x_rgb)):
-            out = torch.cat((x_rgb[i], x_ir[i]), dim=1)
-            out = self.fusion_layers(out, i)
-            x_fuse.append(out)
-        x_fuse = tuple(x_fuse)
+        x_rgb, x_ir, x_fuse, decisions = self.extract_feat(batch_inputs)
+        # print('-----------------------\n')
+        # print(decisions)
+        # print('\n')
 
         # If there are no pre-defined proposals, use RPN to get proposals
         if batch_data_samples[0].get('proposals', None) is None:
@@ -358,6 +360,8 @@ class AdaptiveModel(BaseDetector):
         x = []
         for i in range(len(x_rgb)):
             decisions = self.policy_layers[i](x_rgb[i], x_ir[i])
+            # print(decisions)
+            # print('\n')
             out_rgb = self.judge(decisions[0], x_rgb[i])
             out_ir = self.judge(decisions[1], x_ir[i])
             out = out_rgb + out_ir

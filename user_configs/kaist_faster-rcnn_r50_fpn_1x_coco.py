@@ -11,9 +11,10 @@ custom_imports = dict(
 
 image_size=(640, 512)
 dataset_type = 'CocoDataset'
+# classes = ('person', 'people', 'cyclist')
 classes = ('person')
-data_root = 'data/kaist_onlyperson/'
-work_dir = './work_dirs/kaist_onlyperson_faster-rcnn_r50_fpn_1x_coco/'
+data_root = 'data/BMVC_Mod_0/'
+work_dir = './work_dirs/BMVC_all_faster-rcnn_r50_fpn_1x_coco/'
 
 default_hooks = dict(
     checkpoint=dict(interval=1, save_best='coco/bbox_mAP_50', rule='greater', type='CheckpointHook'),
@@ -27,9 +28,10 @@ model = dict(
         end_level=2),
     fusion_layers=dict(
         type='FusionLayer',
-        num_outs=3,
-        out_channels=256,
-        fusion_pattern='Conv'),
+        num_outs=4,
+        out_channels=[256, 512, 1024, 2048],
+        # out_channels=[256, 256, 256, 256],
+        fusion_pattern='C3'),
     roi_head=dict(
         bbox_head=dict(
             loss_bbox=dict(loss_weight=1.0, type='SmoothL1Loss'),
@@ -98,7 +100,8 @@ train_dataloader = dict(
     )
 
 val_evaluator = dict(
-    ann_file='data/kaist_onlyperson/annotations/val.json')
+    ann_file='data/BMVC_Mod_all/annotations/val.json')
+    # classwise=True)
 
 val_pipeline = [
     dict(backend_args=None, type='LoadTwoStreamImageFromFiles'),
@@ -128,8 +131,9 @@ val_dataloader = dict(
     )
 
 test_evaluator = dict(
-    ann_file='data/kaist_onlyperson/annotations/test.json',
+    ann_file='data/BMVC_Mod_all/annotations/test.json',
     outfile_prefix=work_dir,
+    # classwise=True,
     type='CocoMetricMod')
 
 test_pipeline = [

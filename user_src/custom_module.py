@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from mmdet.registry import MODELS
 from mmcv.cnn import ConvModule
+import math
 
 class PolicyNet(nn.Module):
     def __init__(self,
@@ -146,7 +147,7 @@ class CrossConv(nn.Module):
 class FusionLayer(nn.Module):
     def __init__(self,
                  num_outs = 3,
-                 out_channels = 256,
+                 out_channels = [256,],
                  fusion_pattern='C3'):
         super().__init__()
         self.num_outs = num_outs
@@ -154,25 +155,25 @@ class FusionLayer(nn.Module):
         for i in range(self.num_outs):
             if fusion_pattern == 'Conv':
                 fusion_layer = ConvModule(
-                    in_channels=int(out_channels * 2),
-                    out_channels=out_channels,
+                    in_channels=int(out_channels[i] * 2),
+                    out_channels=out_channels[i],
                     kernel_size=1)
             elif fusion_pattern == 'ConvConv':
                 fusion_layer = CrossConv(
-                    in_channels=int(out_channels * 2),
-                    out_channels=out_channels,
+                    in_channels=int(out_channels[i] * 2),
+                    out_channels=out_channels[i],
                     shortcut=False,
                     e=1.5)
             elif fusion_pattern == 'Cross':
                 fusion_layer = CrossConv(
-                    in_channels=int(out_channels * 2),
-                    out_channels=out_channels,
+                    in_channels=int(out_channels[i] * 2),
+                    out_channels=out_channels[i],
                     shortcut=True,
                     e=1.0)
             elif fusion_pattern == 'C3':
                 fusion_layer = C3(
-                    in_channels=int(out_channels * 2),
-                    out_channels=out_channels,
+                    in_channels=int(out_channels[i] * 2),
+                    out_channels=out_channels[i],
                     n=1,
                     shortcut=True,
                     e=0.5)
@@ -185,5 +186,39 @@ class FusionLayer(nn.Module):
     def forward(self, x, index):
         x = self.fusion_layers[index](x)
         return x
-    
 
+class ChannelAttention(nn.Module):
+    def __init__(self, in_channels, gamma = 2, b = 1):
+        super().__init__()
+        k = int(abs((math.log(in_channels, 2) + b) / gamma))
+        kernel_size = k if k % 2 else k + 1
+        padding = kernel_size // 2
+        self.avgpool = nn.AdaptiveAvgPool2d(output_size = 1)
+        self.maxpool = nn.AdaptiveMaxPool2d(output_size = 1)
+        self.conv = nn.Sequential(
+            nn.Conv1d(in_channels=1, out_channels=1, kernel_size=kernel_size, padding=padding, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self,x):
+        out_avg = self.avgpool(x)
+        out_avg = out_avg.view(x.size(0), 1, x.size(1))
+        out_max = self.maxpool(x)
+        out_max = out_max.view(x.size(0), 1, x.size(1))
+        out = out_avg + out_max
+        out = self.conv(out)
+        out = out.view(x.size(0), x.size(1), 1, 1)
+        return out * x
+
+class SpatialAttention(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv2d = nn.Conv2d(in_channels=2, out_channels=1, kernel_size=7, stride=1, padding=3)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avgout = torch.mean(x, dim=1, keepdim=True)
+        maxout, _ = torch.max(x, dim=1, keepdim=True)
+        out = torch.cat([avgout, maxout], dim=1)
+        out = self.sigmoid(self.conv2d(out))
+        return out * x

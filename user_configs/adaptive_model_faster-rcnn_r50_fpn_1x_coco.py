@@ -14,9 +14,9 @@ custom_hooks = [
     dict(type='AdjustModeHook')
 ]
 
-work_dir = './work_dirs/adaptive_model_loss001_kaist_onlyperson/'
-randomness = dict(seed=1907893643) # onlyperson
-# randomness = dict(seed=1531503327) # BMVC_Mod
+work_dir = './work_dirs/adaptive_model_BMVC_Mod_all_mid_fuse/'
+# randomness = dict(seed=1907893643) # onlyperson
+randomness = dict(seed=1531503327) # BMVC_Mod
 
 train_dataloader = dict(
     batch_size=2,)

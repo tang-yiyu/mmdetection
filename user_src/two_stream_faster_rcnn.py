@@ -40,6 +40,7 @@ class TwoStreamFasterRCNN(BaseDetector):
         if neck is not None:
             self.neck_rgb = MODELS.build(neck)
             self.neck_ir = MODELS.build(neck)
+            self.neck_fuse = MODELS.build(neck)
 
         if rpn_head is not None:
             rpn_train_cfg = train_cfg.rpn if train_cfg is not None else None
@@ -126,24 +127,19 @@ class TwoStreamFasterRCNN(BaseDetector):
         if len(x_rgb) != len(x_ir):
             raise ValueError('The length of rgb feature and ir feature should be the same.')
 
-        # x = []
-        # for i in range(len(x_rgb)):
-        #     out = torch.cat((x_rgb[i], x_ir[i]), dim=1)
-        #     out = self.fusion_layers(out, i)
-        #     x.append(out)
-        # x = tuple(x)
+        x_fuse = []
+        for i in range(len(x_rgb)):
+            out = torch.cat((x_rgb[i], x_ir[i]), dim=1)
+            out = self.fusion_layers(out, i)
+            x_fuse.append(out)
+        x_fuse = tuple(x_fuse)
 
         if self.with_neck:
             x_rgb = self.neck_rgb(x_rgb)
             x_ir = self.neck_ir(x_ir)
-            x = []
-            for i in range(len(x_rgb)):
-                out = torch.cat((x_rgb[i], x_ir[i]), dim=1)
-                out = self.fusion_layers(out, i)
-                x.append(out)
-            x = tuple(x)
+            x_fuse = self.neck_fuse(x_fuse)
         
-        return x
+        return x_rgb, x_ir, x_fuse
 
     def _forward(self, batch_inputs: Tensor,
                  batch_data_samples: SampleList) -> tuple:
@@ -161,16 +157,21 @@ class TwoStreamFasterRCNN(BaseDetector):
             forward.
         """
         results = ()
-        x = self.extract_feat(batch_inputs)
+        x_rgb, x_ir, x_fuse = self.extract_feat(batch_inputs)
 
         if self.with_rpn:
             rpn_results_list = self.rpn_head.predict(
-                x, batch_data_samples, rescale=False)
+                x_fuse, batch_data_samples, rescale=False)
         else:
             assert batch_data_samples[0].get('proposals', None) is not None
             rpn_results_list = [
                 data_sample.proposals for data_sample in batch_data_samples
             ]
+        x = []
+        for i in range(len(x_rgb)):
+            out = x_rgb[i] + x_ir[i]
+            x.append(out)
+        x = tuple(x)
         roi_outs = self.roi_head.forward(x, rpn_results_list,
                                          batch_data_samples)
         results = results + (roi_outs, )
@@ -190,7 +191,7 @@ class TwoStreamFasterRCNN(BaseDetector):
         Returns:
             dict: A dictionary of loss components
         """
-        x = self.extract_feat(batch_inputs)
+        x_rgb, x_ir, x_fuse = self.extract_feat(batch_inputs)
 
         losses = dict()
 
@@ -205,7 +206,7 @@ class TwoStreamFasterRCNN(BaseDetector):
                     torch.zeros_like(data_sample.gt_instances.labels)
 
             rpn_losses, rpn_results_list = self.rpn_head.loss_and_predict(
-                x, rpn_data_samples, proposal_cfg=proposal_cfg)
+                x_fuse, rpn_data_samples, proposal_cfg=proposal_cfg)
             # avoid get same name with roi_head loss
             keys = rpn_losses.keys()
             for key in list(keys):
@@ -219,7 +220,11 @@ class TwoStreamFasterRCNN(BaseDetector):
             rpn_results_list = [
                 data_sample.proposals for data_sample in batch_data_samples
             ]
-
+        x = []
+        for i in range(len(x_rgb)):
+            out = x_rgb[i] + x_ir[i]
+            x.append(out)
+        x = tuple(x)
         roi_losses = self.roi_head.loss(x, rpn_results_list,
                                         batch_data_samples)
         losses.update(roi_losses)
@@ -257,17 +262,21 @@ class TwoStreamFasterRCNN(BaseDetector):
         """
 
         assert self.with_bbox, 'Bbox head must be implemented.'
-        x = self.extract_feat(batch_inputs)
+        x_rgb, x_ir, x_fuse = self.extract_feat(batch_inputs)
 
         # If there are no pre-defined proposals, use RPN to get proposals
         if batch_data_samples[0].get('proposals', None) is None:
             rpn_results_list = self.rpn_head.predict(
-                x, batch_data_samples, rescale=False)
+                x_fuse, batch_data_samples, rescale=False)
         else:
             rpn_results_list = [
                 data_sample.proposals for data_sample in batch_data_samples
             ]
-
+        x = []
+        for i in range(len(x_rgb)):
+            out = x_rgb[i] + x_ir[i]
+            x.append(out)
+        x = tuple(x)
         results_list = self.roi_head.predict(
             x, rpn_results_list, batch_data_samples, rescale=rescale)
 

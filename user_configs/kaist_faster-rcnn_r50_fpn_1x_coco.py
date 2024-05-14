@@ -13,8 +13,8 @@ image_size=(640, 512)
 dataset_type = 'CocoDataset'
 # classes = ('person', 'people', 'cyclist')
 classes = ('person')
-data_root = 'data/BMVC_Mod_0/'
-work_dir = './work_dirs/BMVC_all_faster-rcnn_r50_fpn_1x_coco/'
+data_root = 'data/BMVC/'
+work_dir = './work_dirs/BMVC_0_no_aug_faster-rcnn_r50_fpn_1x_coco/'
 
 default_hooks = dict(
     checkpoint=dict(interval=1, save_best='coco/bbox_mAP_50', rule='greater', type='CheckpointHook'),
@@ -75,14 +75,14 @@ train_pipeline = [
     #     crop_size=(384, 480),
     #     recompute_bbox=True,
     #     allow_negative_crop=True),
-    dict(type='RandomErasingTwoStream', n_patches=(1, 5), ratio=(0.02, 0.2), squared=False),
-    dict(
-        type='RandomResize',
-        scale=image_size,
-        ratio_range=(0.5, 2.0),
-        resize_type='ResizeTwoStream',
-        keep_ratio=True),
-    dict(prob=0.5, type='RandomFlipTwoStream'),
+    # dict(type='RandomErasingTwoStream', n_patches=(1, 5), ratio=(0.02, 0.2), squared=False),
+    # dict(
+    #     type='RandomResize',
+    #     scale=image_size,
+    #     ratio_range=(0.5, 2.0),
+    #     resize_type='ResizeTwoStream',
+    #     keep_ratio=True),
+    # dict(prob=0.5, type='RandomFlipTwoStream'),
     dict(type='PackDetInputsTwoStream'),
 ]
 
@@ -100,7 +100,7 @@ train_dataloader = dict(
     )
 
 val_evaluator = dict(
-    ann_file='data/BMVC_Mod_all/annotations/val.json')
+    ann_file='data/BMVC/annotations/val.json')
     # classwise=True)
 
 val_pipeline = [
@@ -131,7 +131,7 @@ val_dataloader = dict(
     )
 
 test_evaluator = dict(
-    ann_file='data/BMVC_Mod_all/annotations/test.json',
+    ann_file='data/BMVC/annotations/test.json',
     outfile_prefix=work_dir,
     # classwise=True,
     type='CocoMetricMod')

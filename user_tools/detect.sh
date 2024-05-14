@@ -18,6 +18,7 @@
 # CUDA_VISIBLE_DEVICES=1 python tools/test.py work_dirs/kaist_nounpaired_transpro_faster-rcnn_r50_fpn_1x_coco/kaist_faster-rcnn_r50_fpn_1x_coco.py work_dirs/kaist_nounpaired_transpro_faster-rcnn_r50_fpn_1x_coco/best_coco_bbox_mAP_50_epoch_5.pth --show-dir vis
 # CUDA_VISIBLE_DEVICES=1 python tools/test.py work_dirs/kaist_onlyperson_transpro_faster-rcnn_r50_fpn_1x_coco/kaist_faster-rcnn_r50_fpn_1x_coco.py work_dirs/kaist_onlyperson_transpro_faster-rcnn_r50_fpn_1x_coco/best_coco_bbox_mAP_50_epoch_6.pth --show-dir vis
 # CUDA_VISIBLE_DEVICES=1 python tools/test.py work_dirs/kaist_BMVC_trans2_faster-rcnn_r50_fpn_1x_coco/kaist_faster-rcnn_r50_fpn_1x_coco.py work_dirs/kaist_BMVC_trans2_faster-rcnn_r50_fpn_1x_coco/best_coco_bbox_mAP_50_epoch_18.pth --show-dir vis
-CUDA_VISIBLE_DEVICES=1 python tools/test.py work_dirs/kaist_BMVC_trans3_faster-rcnn_r50_fpn_1x_coco/kaist_faster-rcnn_r50_fpn_1x_coco.py work_dirs/kaist_BMVC_trans3_faster-rcnn_r50_fpn_1x_coco/best_coco_bbox_mAP_50_epoch_10.pth --show-dir vis
-CUDA_VISIBLE_DEVICES=1 python tools/test.py work_dirs/kaist_BMVC_trans4_faster-rcnn_r50_fpn_1x_coco/kaist_faster-rcnn_r50_fpn_1x_coco.py work_dirs/kaist_BMVC_trans4_faster-rcnn_r50_fpn_1x_coco/best_coco_bbox_mAP_50_epoch_10.pth --show-dir vis
+# CUDA_VISIBLE_DEVICES=1 python tools/test.py work_dirs/kaist_BMVC_trans3_faster-rcnn_r50_fpn_1x_coco/kaist_faster-rcnn_r50_fpn_1x_coco.py work_dirs/kaist_BMVC_trans3_faster-rcnn_r50_fpn_1x_coco/best_coco_bbox_mAP_50_epoch_10.pth --show-dir vis
+CUDA_VISIBLE_DEVICES=2 python tools/test.py work_dirs/BMVC_0_faster-rcnn_r50_fpn_1x_coco/kaist_faster-rcnn_r50_fpn_1x_coco.py work_dirs/BMVC_0_faster-rcnn_r50_fpn_1x_coco/best_coco_bbox_mAP_50_epoch_4.pth --show-dir vis
+CUDA_VISIBLE_DEVICES=2 python tools/test.py work_dirs/BMVC_0_no_aug_faster-rcnn_r50_fpn_1x_coco/kaist_faster-rcnn_r50_fpn_1x_coco.py work_dirs/BMVC_0_no_aug_faster-rcnn_r50_fpn_1x_coco/best_coco_bbox_mAP_50_epoch_3.pth --show-dir vis
 

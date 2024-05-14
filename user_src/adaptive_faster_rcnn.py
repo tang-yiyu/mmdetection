@@ -174,10 +174,10 @@ class AdaptiveModel(BaseDetector):
 
         features_rgb = self.feature_rgb(batch_inputs_rgb)
         features_ir = self.feature_ir(batch_inputs_ir)
-        decisions = self.policy_net(features_rgb[0], features_ir[0])
-        batch_inputs_rgb = self.judge(decisions[0], batch_inputs_rgb)
-        batch_inputs_ir = self.judge(decisions[1], batch_inputs_ir)
-        # decisions = torch.tensor([[0., 1.], [1., 1.]], device=batch_inputs_rgb.device)
+        selections = self.policy_net(features_rgb[0], features_ir[0])
+        batch_inputs_rgb = self.judge(selections[0], batch_inputs_rgb)
+        batch_inputs_ir = self.judge(selections[1], batch_inputs_ir)
+        # selection = torch.tensor([[0., 1.], [1., 1.]], device=batch_inputs_rgb.device)
 
         x_rgb = self.backbone_rgb(batch_inputs_rgb)
         x_ir = self.backbone_ir(batch_inputs_ir)
@@ -185,13 +185,13 @@ class AdaptiveModel(BaseDetector):
         if len(x_rgb) != len(x_ir):
             raise ValueError('The length of rgb feature and ir feature should be the same.')
         
+        selections_set = []
+        selections_set.append(selections)
         x_fuse = []
         for i in range(len(x_rgb)):
-            # out = x_rgb[i] + x_ir[i]
             out = torch.cat((x_rgb[i], x_ir[i]), dim=1)
             # out = self.attention_layers[i](out)
             out = self.fusion_layers(out, i)
-            # out = self.attention_layers[i](out)
             x_fuse.append(out)
         x_fuse = tuple(x_fuse)
 
@@ -200,7 +200,7 @@ class AdaptiveModel(BaseDetector):
             x_ir = self.neck_ir(x_ir)
             x_fuse = self.neck_fuse(x_fuse)
         
-        return x_rgb, x_ir, x_fuse, decisions
+        return x_rgb, x_ir, x_fuse, selections_set
 
     def _forward(self, batch_inputs: Tensor,
                  batch_data_samples: SampleList) -> tuple:
@@ -258,10 +258,11 @@ class AdaptiveModel(BaseDetector):
         Returns:
             dict: A dictionary of loss components
         """
-        x_rgb, x_ir, x_fuse, decisions = self.extract_feat(batch_inputs)
+        x_rgb, x_ir, x_fuse, selection_set = self.extract_feat(batch_inputs)
         
         decisions_set = []
-        decisions_set.append(decisions)
+        for selections in selection_set:
+            decisions_set.append(selections)
         losses = dict()
 
         # RPN forward and loss
@@ -343,10 +344,7 @@ class AdaptiveModel(BaseDetector):
         """
 
         assert self.with_bbox, 'Bbox head must be implemented.'
-        x_rgb, x_ir, x_fuse, decisions = self.extract_feat(batch_inputs)
-        # print('-----------------------\n')
-        # print(decisions)
-        # print('\n')
+        x_rgb, x_ir, x_fuse, _ = self.extract_feat(batch_inputs)
 
         # If there are no pre-defined proposals, use RPN to get proposals
         if batch_data_samples[0].get('proposals', None) is None:
@@ -360,8 +358,6 @@ class AdaptiveModel(BaseDetector):
         x = []
         for i in range(len(x_rgb)):
             decisions = self.policy_layers[i](x_rgb[i], x_ir[i])
-            # print(decisions)
-            # print('\n')
             out_rgb = self.judge(decisions[0], x_rgb[i])
             out_ir = self.judge(decisions[1], x_ir[i])
             out = out_rgb + out_ir

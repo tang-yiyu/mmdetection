@@ -13,5 +13,6 @@
 # scp -r -P 33024 /data1/tyy/mmdetection/work_dirs/kaist_nounpaired_transpro_faster-rcnn_r50_fpn_1x_coco/labels user@10.70.17.11:/data1/tyy/KAIST_MR/mmdetection/kaist_nounpaired_transpro
 # scp -r -P 33024 /data1/tyy/mmdetection/work_dirs/kaist_BMVC_trans_faster-rcnn_r50_fpn_1x_coco/labels user@10.70.17.11:/data1/tyy/KAIST_MR/mmdetection/kaist_BMVC_trans
 # scp -r -P 33024 /data1/tyy/mmdetection/work_dirs/kaist_BMVC_trans2_faster-rcnn_r50_fpn_1x_coco/labels user@10.70.17.11:/data1/tyy/KAIST_MR/mmdetection/kaist_BMVC_trans2
-scp -r -P 33024 /data1/tyy/mmdetection/work_dirs/kaist_BMVC_trans3_faster-rcnn_r50_fpn_1x_coco/labels user@10.70.17.11:/data1/tyy/KAIST_MR/mmdetection/kaist_BMVC_trans3
-scp -r -P 33024 /data1/tyy/mmdetection/work_dirs/kaist_BMVC_trans4_faster-rcnn_r50_fpn_1x_coco/labels user@10.70.17.11:/data1/tyy/KAIST_MR/mmdetection/kaist_BMVC_trans4
+scp -r -P 33024 /data1/tyy/mmdetection/work_dirs/BMVC_0_faster-rcnn_r50_fpn_1x_coco/labels user@10.70.17.11:/data/tyy/KAIST_MR/BMVC_0
+scp -r -P 33024 /data1/tyy/mmdetection/work_dirs/BMVC_0_no_aug_faster-rcnn_r50_fpn_1x_coco/labels user@10.70.17.11:/data/tyy/KAIST_MR/BMVC_0_no_aug
+# scp -r -P 33024 /data1/tyy/mmdetection/.git user@10.70.17.11:/data/tyy/mmdetection/.git

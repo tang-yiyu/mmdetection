@@ -9,12 +9,13 @@ custom_imports = dict(
              'user_src.custom_module'], 
     allow_failed_imports=False)
 
-image_size=(640, 512)
+image_size=(960, 540)
+# image_size=(640, 360)
 dataset_type = 'CocoDataset'
-# classes = ('person', 'people', 'cyclist')
 classes = ('person')
-data_root = 'data/BMVC/'
-work_dir = './work_dirs/BMVC_0_no_aug_faster-rcnn_r50_fpn_1x_coco/'
+data_root = 'data/VTUAV/'
+work_dir = './work_dirs/vtuav2_faster-rcnn_r50_fpn_1x_coco/'
+randomness = dict(seed=1539225152)
 
 default_hooks = dict(
     checkpoint=dict(interval=1, save_best='coco/bbox_mAP_50', rule='greater', type='CheckpointHook'),
@@ -39,11 +40,13 @@ model = dict(
     rpn_head=dict(
         anchor_generator=dict(
             ratios=[
-                0.41
+                0.41,
+                1.0,
             ],
             scales=[
+                2,
+                4,
                 8,
-                11.3137,
             ],
             strides=[
                 4,
@@ -56,7 +59,7 @@ model = dict(
         rcnn=dict(
             max_per_img=100,
             nms=dict(iou_threshold=0.5, type='nms'),
-            score_thr=0.001)),
+            score_thr=0.05)),
     type='TwoStreamFasterRCNN')
 
 # optim_wrapper = dict(
@@ -76,6 +79,7 @@ train_pipeline = [
     #     recompute_bbox=True,
     #     allow_negative_crop=True),
     dict(type='RandomErasingTwoStream', n_patches=(1, 5), ratio=(0.02, 0.2), squared=False),
+    dict(keep_ratio=True, scale=image_size, type='ResizeTwoStream'),
     # dict(
     #     type='RandomResize',
     #     scale=image_size,
@@ -100,8 +104,8 @@ train_dataloader = dict(
     )
 
 val_evaluator = dict(
-    ann_file='data/BMVC/annotations/val.json')
-    # classwise=True)
+    ann_file='data/VTUAV/annotations/val.json',
+    type='CocoMetric')
 
 val_pipeline = [
     dict(backend_args=None, type='LoadTwoStreamImageFromFiles'),
@@ -131,10 +135,9 @@ val_dataloader = dict(
     )
 
 test_evaluator = dict(
-    ann_file='data/BMVC/annotations/test.json',
+    ann_file='data/VTUAV/annotations/val.json',
     outfile_prefix=work_dir,
-    # classwise=True,
-    type='CocoMetricMod')
+    type='CocoMetric')
 
 test_pipeline = [
     dict(backend_args=None, type='LoadTwoStreamImageFromFiles'),

@@ -11,10 +11,9 @@ custom_imports = dict(
 
 image_size=(640, 512)
 dataset_type = 'CocoDataset'
-# classes = ('person', 'people', 'cyclist')
-classes = ('person')
-data_root = 'data/BMVC/'
-work_dir = './work_dirs/BMVC_0_no_aug_faster-rcnn_r50_fpn_1x_coco/'
+classes = ('person', 'rider', 'crowd')
+data_root = 'data/DronePerson/'
+work_dir = './work_dirs/droneperson_faster-rcnn_r50_fpn_1x_coco/'
 
 default_hooks = dict(
     checkpoint=dict(interval=1, save_best='coco/bbox_mAP_50', rule='greater', type='CheckpointHook'),
@@ -35,15 +34,18 @@ model = dict(
     roi_head=dict(
         bbox_head=dict(
             loss_bbox=dict(loss_weight=1.0, type='SmoothL1Loss'),
-            num_classes=1)),
+            num_classes=3)),
     rpn_head=dict(
         anchor_generator=dict(
             ratios=[
-                0.41
+                0.41,
+                1.0,
             ],
             scales=[
+                1,
+                2,
+                4,
                 8,
-                11.3137,
             ],
             strides=[
                 4,
@@ -55,8 +57,8 @@ model = dict(
     test_cfg=dict(
         rcnn=dict(
             max_per_img=100,
-            nms=dict(iou_threshold=0.5, type='nms'),
-            score_thr=0.001)),
+            nms=dict(iou_threshold=0.3, type='nms'),
+            score_thr=0.05)),
     type='TwoStreamFasterRCNN')
 
 # optim_wrapper = dict(
@@ -100,8 +102,9 @@ train_dataloader = dict(
     )
 
 val_evaluator = dict(
-    ann_file='data/BMVC/annotations/val.json')
-    # classwise=True)
+    ann_file='data/DronePerson/annotations/val.json',
+    classwise=True,
+    type='DronePerson')
 
 val_pipeline = [
     dict(backend_args=None, type='LoadTwoStreamImageFromFiles'),
@@ -131,10 +134,10 @@ val_dataloader = dict(
     )
 
 test_evaluator = dict(
-    ann_file='data/BMVC/annotations/test.json',
+    ann_file='data/DronePerson/annotations/val.json',
     outfile_prefix=work_dir,
-    # classwise=True,
-    type='CocoMetricMod')
+    classwise=True,
+    type='DronePerson')
 
 test_pipeline = [
     dict(backend_args=None, type='LoadTwoStreamImageFromFiles'),

@@ -156,14 +156,18 @@ class AdjustModeHook(Hook):
 
     def freeze_policy_net(self):
         self.model.update_policy_net = False
-        for param in self.model.feature_rgb.parameters():
-            param.requires_grad = False
+        # for param in self.model.feature_rgb.parameters():
+        #     param.requires_grad = False
 
-        for param in self.model.feature_ir.parameters():
-            param.requires_grad = False
+        # for param in self.model.feature_ir.parameters():
+        #     param.requires_grad = False
 
-        for param in self.model.policy_net.parameters():
-            param.requires_grad = False
+        # for param in self.model.policy_net.parameters():
+        #     param.requires_grad = False
+
+        for selection_layer in self.model.selection_layers:
+            for param in selection_layer.parameters():
+                param.requires_grad = False
 
         for policy_layer in self.model.policy_layers:
             for param in policy_layer.parameters():
@@ -171,14 +175,18 @@ class AdjustModeHook(Hook):
 
     def unfreeze_policy_net(self):
         self.model.update_policy_net = True
-        for param in self.model.feature_rgb.parameters():
-            param.requires_grad = True
+        # for param in self.model.feature_rgb.parameters():
+        #     param.requires_grad = True
 
-        for param in self.model.feature_ir.parameters():
-            param.requires_grad = True
+        # for param in self.model.feature_ir.parameters():
+        #     param.requires_grad = True
 
-        for param in self.model.policy_net.parameters():
-            param.requires_grad = True
+        # for param in self.model.policy_net.parameters():
+        #     param.requires_grad = True
+
+        for selection_layer in self.model.selection_layers:
+            for param in selection_layer.parameters():
+                param.requires_grad = True
             
         for policy_layer in self.model.policy_layers:
             for param in policy_layer.parameters():
@@ -263,7 +271,9 @@ class AdjustModeHook(Hook):
                     self.unfreeze_policy_net()
                     self.freeze_main_net()
                     if epoch > prepare_epoch:
-                        self.model.policy_net.decay_temperature(0.85)
+                        # self.model.policy_net.decay_temperature(0.85)
+                        for selection_layer in self.model.selection_layers:
+                            selection_layer.decay_temperature(0.85)
                         for policy_layer in self.model.policy_layers:
                             policy_layer.decay_temperature(0.85)
                 elif ((epoch - prepare_epoch) % 2 == 0) and ((epoch - prepare_epoch) % 4 != 0):

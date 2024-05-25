@@ -14,7 +14,7 @@ image_size=(960, 540)
 dataset_type = 'CocoDataset'
 classes = ('person')
 data_root = 'data/VTUAV/'
-work_dir = './work_dirs/vtuav2_faster-rcnn_r50_fpn_1x_coco/'
+work_dir = './work_dirs/vtuav_anchor_faster-rcnn_r50_fpn_1x_coco/'
 randomness = dict(seed=1539225152)
 
 default_hooks = dict(
@@ -45,7 +45,6 @@ model = dict(
             ],
             scales=[
                 2,
-                4,
                 8,
             ],
             strides=[
@@ -105,6 +104,7 @@ train_dataloader = dict(
 
 val_evaluator = dict(
     ann_file='data/VTUAV/annotations/val.json',
+    classwise=True,
     type='CocoMetric')
 
 val_pipeline = [
@@ -137,6 +137,7 @@ val_dataloader = dict(
 test_evaluator = dict(
     ann_file='data/VTUAV/annotations/val.json',
     outfile_prefix=work_dir,
+    classwise=True,
     type='CocoMetric')
 
 test_pipeline = [

@@ -13,7 +13,8 @@ image_size=(640, 512)
 dataset_type = 'CocoDataset'
 classes = ('person', 'rider', 'crowd')
 data_root = 'data/DronePerson/'
-work_dir = './work_dirs/droneperson_faster-rcnn_r50_fpn_1x_coco/'
+work_dir = './work_dirs/droneperson_anchor2_faster-rcnn_r50_fpn_1x_coco/'
+randomness = dict(seed=608238547)
 
 default_hooks = dict(
     checkpoint=dict(interval=1, save_best='coco/bbox_mAP_50', rule='greater', type='CheckpointHook'),
@@ -32,6 +33,7 @@ model = dict(
         # out_channels=[256, 256, 256, 256],
         fusion_pattern='C3'),
     roi_head=dict(
+        bbox_roi_extractor=dict(featmap_strides=[4, 8, 16]),
         bbox_head=dict(
             loss_bbox=dict(loss_weight=1.0, type='SmoothL1Loss'),
             num_classes=3)),
@@ -53,7 +55,7 @@ model = dict(
                 16,
             ],
             type='AnchorGenerator'),
-        loss_bbox=dict(loss_weight=1.0, type='SmoothL1Loss'),),
+        loss_bbox=dict(loss_weight=1.0, type='SmoothL1Loss')),
     test_cfg=dict(
         rcnn=dict(
             max_per_img=100,

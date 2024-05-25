@@ -14,7 +14,7 @@ custom_hooks = [
     dict(type='AdjustModeHook')
 ]
 
-work_dir = './work_dirs/adaptive_model_droneperson_faster-rcnn_r50_fpn_1x_coco/'
+work_dir = './work_dirs/adaptive_model_droneperson_selection1_faster-rcnn_r50_fpn_1x_coco/'
 
 train_dataloader = dict(
     batch_size=2,)
@@ -23,19 +23,24 @@ test_evaluator = dict(
     outfile_prefix=work_dir)
 
 model = dict(
-    feature_layers=dict(
-        type='MobileNetV2',
-        out_indices=(7,),
-        init_cfg=dict(
-            type='Pretrained', checkpoint='open-mmlab://mmdet/mobilenet_v2'),
-    ),
-    loss_policy=dict(loss_weight=0.01, type='PolicyLoss'),
+    # feature_layers=dict(
+    #     type='MobileNetV2',
+    #     out_indices=(7,),
+    #     init_cfg=dict(
+    #         type='Pretrained', checkpoint='open-mmlab://mmdet/mobilenet_v2'),
+    # ),
+    loss_policy=dict(loss_weight=0.001, type='PolicyLoss'),
+    # train_cfg=dict(
+    #     rcnn=dict(
+    #         assigner=dict(_delete_=True, type='ATSSAssigner', topk=9)),
+    #     rpn=dict(
+    #         assigner=dict(_delete_=True, type='ATSSAssigner', topk=9))),
     type='AdaptiveModel')
 
 optim_wrapper = dict(
-    # optimizer=dict(lr=0.001, momentum=0.9, type='SGD', weight_decay=0.0001),
+    optimizer=dict(lr=0.01, momentum=0.9, type='SGD', weight_decay=0.0001),
     clip_grad=dict(max_norm=10, norm_type=2),
-    type='OptimWrapper')
+    type='AmpOptimWrapper')
 
 param_scheduler = [
     dict(
@@ -44,12 +49,10 @@ param_scheduler = [
         end=40,
         gamma=0.1,
         milestones=[
-            5,
-            11,
+            8,
             17,
-            23,
-            29,
-            35,
+            28,
+            36,
         ],
         type='MultiStepLR'),
 ]

@@ -10,6 +10,7 @@ from mmdet.registry import MODELS
 from mmdet.structures import SampleList
 from mmdet.utils import ConfigType, OptConfigType, OptMultiConfig
 from mmdet.models.detectors.base import BaseDetector
+from mmengine.logging import MMLogger
 
 from user_src.custom_module import  PolicyNet, ChannelAttention, SpatialAttention
 
@@ -39,21 +40,20 @@ class AdaptiveModel(BaseDetector):
         self.backbone_rgb = MODELS.build(backbone)
         self.backbone_ir = MODELS.build(backbone)
 
-        self.feature_rgb = MODELS.build(feature_layers)
-        self.feature_ir = MODELS.build(feature_layers)
+        # self.feature_rgb = MODELS.build(feature_layers)
+        # self.feature_ir = MODELS.build(feature_layers)
 
-        self.policy_net = PolicyNet(in_channels=2560)
+        # self.policy_net = PolicyNet(in_channels=2560)
 
         self.fusion_layers = MODELS.build(fusion_layers)
 
-        # self.attention_layers = []
-        # for i in range(fusion_layers.num_outs):
-        #     attention_layer = nn.Sequential(ChannelAttention(2*fusion_layers.out_channels[i]),
-        #                                     SpatialAttention(),
-        #                                     nn.Dropout(0.1))
-        #     attention_layer_name = f'attention_layer{i}'
-        #     self.add_module(attention_layer_name, attention_layer)
-        #     self.attention_layers.append(attention_layer)
+        self.selection_layers = []
+        for i in range(fusion_layers.num_outs):
+            selection_layer = PolicyNet(in_channels=2*fusion_layers.out_channels[i],
+                                        out_feature_c=fusion_layers.out_channels[i])     
+            selection_layer_name = f'selection_layer{i}'
+            self.add_module(selection_layer_name, selection_layer)
+            self.selection_layers.append(selection_layer)
 
         if neck is not None:
             self.neck_rgb = MODELS.build(neck)
@@ -62,7 +62,7 @@ class AdaptiveModel(BaseDetector):
 
         self.policy_layers = []
         for i in range(neck.num_outs):
-            policy_layer = PolicyNet(in_channels=512, out_feature_c = 256)
+            policy_layer = PolicyNet(in_channels=512, out_feature_c=256)
             policy_layer_name = f'policy_layer{i}'
             self.add_module(policy_layer_name, policy_layer)
             self.policy_layers.append(policy_layer)
@@ -172,12 +172,12 @@ class AdaptiveModel(BaseDetector):
         batch_inputs_rgb = batch_inputs[:, :3, :, :]
         batch_inputs_ir = batch_inputs[:, 3:, :, :]
 
-        features_rgb = self.feature_rgb(batch_inputs_rgb)
-        features_ir = self.feature_ir(batch_inputs_ir)
-        selections = self.policy_net(features_rgb[0], features_ir[0])
-        batch_inputs_rgb = self.judge(selections[0], batch_inputs_rgb)
-        batch_inputs_ir = self.judge(selections[1], batch_inputs_ir)
-        # selection = torch.tensor([[0., 1.], [1., 1.]], device=batch_inputs_rgb.device)
+        # features_rgb = self.feature_rgb(batch_inputs_rgb)
+        # features_ir = self.feature_ir(batch_inputs_ir)
+        # selections = self.policy_net(features_rgb[0], features_ir[0])
+        # batch_inputs_rgb = self.judge(selections[0], batch_inputs_rgb)
+        # batch_inputs_ir = self.judge(selections[1], batch_inputs_ir)
+        # # selection = torch.tensor([[0., 1.], [1., 1.]], device=batch_inputs_rgb.device)
 
         x_rgb = self.backbone_rgb(batch_inputs_rgb)
         x_ir = self.backbone_ir(batch_inputs_ir)
@@ -186,11 +186,15 @@ class AdaptiveModel(BaseDetector):
             raise ValueError('The length of rgb feature and ir feature should be the same.')
         
         selections_set = []
-        selections_set.append(selections)
+        # selections_set.append(selections)
         x_fuse = []
         for i in range(len(x_rgb)):
-            out = torch.cat((x_rgb[i], x_ir[i]), dim=1)
-            # out = self.attention_layers[i](out)
+            selections = self.selection_layers[i](x_rgb[i], x_ir[i])
+            selections_set.append(selections)
+            out_rgb = self.judge(selections[0], x_rgb[i])
+            out_ir = self.judge(selections[1], x_ir[i])
+            out = torch.cat((out_rgb, out_ir), dim=1)
+            # out = torch.cat((x_rgb[i], x_ir[i]), dim=1)
             out = self.fusion_layers(out, i)
             x_fuse.append(out)
         x_fuse = tuple(x_fuse)
@@ -342,9 +346,14 @@ class AdaptiveModel(BaseDetector):
                     the last dimension 4 arrange as (x1, y1, x2, y2).
                 - masks (Tensor): Has a shape (num_instances, H, W).
         """
+        logger = MMLogger.get_instance(name='MMLogger')
 
         assert self.with_bbox, 'Bbox head must be implemented.'
-        x_rgb, x_ir, x_fuse, _ = self.extract_feat(batch_inputs)
+        x_rgb, x_ir, x_fuse, selection_set = self.extract_feat(batch_inputs)
+
+        decisions_set = []
+        for selections in selection_set:
+            decisions_set.append(selections)
 
         # If there are no pre-defined proposals, use RPN to get proposals
         if batch_data_samples[0].get('proposals', None) is None:
@@ -358,6 +367,7 @@ class AdaptiveModel(BaseDetector):
         x = []
         for i in range(len(x_rgb)):
             decisions = self.policy_layers[i](x_rgb[i], x_ir[i])
+            decisions_set.append(decisions)
             out_rgb = self.judge(decisions[0], x_rgb[i])
             out_ir = self.judge(decisions[1], x_ir[i])
             out = out_rgb + out_ir
@@ -369,5 +379,15 @@ class AdaptiveModel(BaseDetector):
 
         batch_data_samples = self.add_pred_to_datasample(
             batch_data_samples, results_list)
+        
+        # logger.info(f'Decisions')
+        # for i, decision_result in enumerate(decisions_set):
+        #     logger.info(f'Decisions {i}: {decision_result}')
+            # if i == 0:
+            #     contains_zero = (decision_result == 0)
+            #     contains_zero_any = contains_zero.any()
+            #     if contains_zero_any == True:
+            #         logger.info(f'Decisions {i}: {decision_result}')
+
         return batch_data_samples
  

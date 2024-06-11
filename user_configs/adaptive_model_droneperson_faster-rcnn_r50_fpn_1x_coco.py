@@ -14,7 +14,7 @@ custom_hooks = [
     dict(type='AdjustModeHook')
 ]
 
-work_dir = './work_dirs/adaptive_model_droneperson_selection1_faster-rcnn_r50_fpn_1x_coco/'
+work_dir = './work_dirs/adaptive_model_droneperson_selection8_faster-rcnn_r50_fpn_1x_coco/'
 
 train_dataloader = dict(
     batch_size=2,)

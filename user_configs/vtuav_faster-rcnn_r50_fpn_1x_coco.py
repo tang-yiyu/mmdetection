@@ -10,7 +10,7 @@ custom_imports = dict(
     allow_failed_imports=False)
 
 image_size=(960, 540)
-# image_size=(640, 360)
+# image_size=(640, 512)
 dataset_type = 'CocoDataset'
 classes = ('person')
 data_root = 'data/VTUAV/'
@@ -32,8 +32,9 @@ model = dict(
         num_outs=4,
         out_channels=[256, 512, 1024, 2048],
         # out_channels=[256, 256, 256, 256],
-        fusion_pattern='C3'),
+        fusion_pattern='AC3'),
     roi_head=dict(
+        bbox_roi_extractor=dict(featmap_strides=[4, 8, 16]),
         bbox_head=dict(
             loss_bbox=dict(loss_weight=1.0, type='SmoothL1Loss'),
             num_classes=1)),

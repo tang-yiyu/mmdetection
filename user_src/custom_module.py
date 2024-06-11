@@ -78,6 +78,29 @@ class PolicyNet(nn.Module):
         if dr:
             self.temperature *= dr 
 
+class CrossConv(nn.Module):
+    # Cross Convolution Downsample
+    def __init__(self, in_channels, out_channels, e=1.0, shortcut=False):
+        # ch_in, ch_out, kernel, stride, groups, expansion, shortcut
+        super().__init__()
+        hidden_channels = int(out_channels * e)  # hidden channels
+        self.conv1 = ConvModule(in_channels=in_channels,
+                              out_channels=hidden_channels,
+                              kernel_size=[1, 3],
+                              stride=[1, 1],
+                              norm_cfg=dict(type='BN', requires_grad=True),
+                              act_cfg=dict(type='SiLU', inplace=True))
+        self.conv2 = ConvModule(in_channels=hidden_channels,
+                              out_channels=out_channels,
+                              kernel_size=[3, 1],
+                              stride=[1, 1],
+                              norm_cfg=dict(type='BN', requires_grad=True),
+                              act_cfg=dict(type='SiLU', inplace=True))
+        self.add = shortcut and in_channels == out_channels
+
+    def forward(self, x):
+        return x + self.conv2(self.conv1(x)) if self.add else self.conv2(self.conv1(x))
+
 class Bottleneck(nn.Module):
     # Standard bottleneck
     def __init__(self, in_channels, out_channels, shortcut=True, e=0.5):  # ch_in, ch_out, shortcut, groups, expansion
@@ -119,74 +142,7 @@ class C3(nn.Module):
 
     def forward(self, x):
         return self.conv3(torch.cat((self.m(self.conv1(x)), self.conv2(x)), 1))
-
-class CrossConv(nn.Module):
-    # Cross Convolution Downsample
-    def __init__(self, in_channels, out_channels, e=1.0, shortcut=False):
-        # ch_in, ch_out, kernel, stride, groups, expansion, shortcut
-        super().__init__()
-        hidden_channels = int(out_channels * e)  # hidden channels
-        self.conv1 = ConvModule(in_channels=in_channels,
-                              out_channels=hidden_channels,
-                              kernel_size=[1, 3],
-                              stride=[1, 1],
-                              norm_cfg=dict(type='BN', requires_grad=True),
-                              act_cfg=dict(type='SiLU', inplace=True))
-        self.conv2 = ConvModule(in_channels=hidden_channels,
-                              out_channels=out_channels,
-                              kernel_size=[3, 1],
-                              stride=[1, 1],
-                              norm_cfg=dict(type='BN', requires_grad=True),
-                              act_cfg=dict(type='SiLU', inplace=True))
-        self.add = shortcut and in_channels == out_channels
-
-    def forward(self, x):
-        return x + self.conv2(self.conv1(x)) if self.add else self.conv2(self.conv1(x))
-
-@MODELS.register_module()
-class FusionLayer(nn.Module):
-    def __init__(self,
-                 num_outs = 3,
-                 out_channels = [256,],
-                 fusion_pattern='C3'):
-        super().__init__()
-        self.num_outs = num_outs
-        self.fusion_layers = []
-        for i in range(self.num_outs):
-            if fusion_pattern == 'Conv':
-                fusion_layer = ConvModule(
-                    in_channels=int(out_channels[i] * 2),
-                    out_channels=out_channels[i],
-                    kernel_size=1)
-            elif fusion_pattern == 'ConvConv':
-                fusion_layer = CrossConv(
-                    in_channels=int(out_channels[i] * 2),
-                    out_channels=out_channels[i],
-                    shortcut=False,
-                    e=1.5)
-            elif fusion_pattern == 'Cross':
-                fusion_layer = CrossConv(
-                    in_channels=int(out_channels[i] * 2),
-                    out_channels=out_channels[i],
-                    shortcut=True,
-                    e=1.0)
-            elif fusion_pattern == 'C3':
-                fusion_layer = C3(
-                    in_channels=int(out_channels[i] * 2),
-                    out_channels=out_channels[i],
-                    n=1,
-                    shortcut=True,
-                    e=0.5)
-            else:
-                raise NotImplementedError
-            fusion_layer_name = f'layer{i + 1}_fusion'
-            self.add_module(fusion_layer_name, fusion_layer)
-            self.fusion_layers.append(fusion_layer)
-        
-    def forward(self, x, index):
-        x = self.fusion_layers[index](x)
-        return x
-
+    
 class ChannelAttention(nn.Module):
     def __init__(self, in_channels, gamma = 2, b = 1):
         super().__init__()
@@ -222,3 +178,64 @@ class SpatialAttention(nn.Module):
         out = torch.cat([avgout, maxout], dim=1)
         out = self.sigmoid(self.conv2d(out))
         return out * x
+
+class AC3(nn.Module):
+    def __init__(self, in_channels, out_channels, n=1, shortcut=True, e=0.5):
+        super().__init__()
+        self.attention = nn.Sequential(SpatialAttention())
+        self.c3 = C3(in_channels=int(in_channels),
+                     out_channels=out_channels,
+                     n=n,
+                     shortcut=shortcut,
+                     e=e)
+
+    def forward(self, x):
+        return self.c3(self.attention(x))
+
+@MODELS.register_module()
+class FusionLayer(nn.Module):
+    def __init__(self,
+                 num_outs = 3,
+                 out_channels = [256,],
+                 fusion_pattern='C3'):
+        super().__init__()
+        self.num_outs = num_outs
+        self.fusion_layers = []
+        for i in range(self.num_outs):
+            if fusion_pattern == 'Conv':
+                fusion_layer = ConvModule(
+                    in_channels=int(out_channels[i] * 2),
+                    out_channels=out_channels[i],
+                    kernel_size=1)
+            elif fusion_pattern == 'ConvConv':
+                fusion_layer = CrossConv(
+                    in_channels=int(out_channels[i] * 2),
+                    out_channels=out_channels[i],
+                    shortcut=False,
+                    e=1.5)
+            elif fusion_pattern == 'Cross':
+                fusion_layer = CrossConv(
+                    in_channels=int(out_channels[i] * 2),
+                    out_channels=out_channels[i],
+                    shortcut=True,
+                    e=1.0)
+            elif fusion_pattern == 'C3':
+                fusion_layer = C3(
+                    in_channels=int(out_channels[i] * 2),
+                    out_channels=out_channels[i],
+                    n=1,
+                    shortcut=True,
+                    e=0.5)
+            elif fusion_pattern == 'AC3':
+                fusion_layer = AC3(
+                    in_channels=int(out_channels[i] * 2),
+                    out_channels=out_channels[i])
+            else:
+                raise NotImplementedError
+            fusion_layer_name = f'layer{i + 1}_fusion'
+            self.add_module(fusion_layer_name, fusion_layer)
+            self.fusion_layers.append(fusion_layer)
+        
+    def forward(self, x, index):
+        x = self.fusion_layers[index](x)
+        return x

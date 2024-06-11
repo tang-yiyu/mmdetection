@@ -14,7 +14,7 @@ custom_hooks = [
     dict(type='AdjustModeHook')
 ]
 
-work_dir = './work_dirs/adaptive_model_vtuav_faster-rcnn_r50_fpn_1x_coco/'
+work_dir = './work_dirs/adaptive_model_vtuav_selection10_faster-rcnn_r50_fpn_1x_coco/'
 
 train_dataloader = dict(
     batch_size=2,)
@@ -23,17 +23,17 @@ test_evaluator = dict(
     outfile_prefix=work_dir)
 
 model = dict(
-    feature_layers=dict(
-        type='MobileNetV2',
-        out_indices=(7,),
-        init_cfg=dict(
-            type='Pretrained', checkpoint='open-mmlab://mmdet/mobilenet_v2'),
-    ),
-    loss_policy=dict(loss_weight=0.01, type='PolicyLoss'),
+    # feature_layers=dict(
+    #     type='MobileNetV2',
+    #     out_indices=(7,),
+    #     init_cfg=dict(
+    #         type='Pretrained', checkpoint='open-mmlab://mmdet/mobilenet_v2'),
+    # ),
+    loss_policy=dict(loss_weight=0.001, type='PolicyLoss'),
     type='AdaptiveModel')
 
 optim_wrapper = dict(
-    # optimizer=dict(lr=0.001, momentum=0.9, type='SGD', weight_decay=0.0001),
+    # optimizer=dict(lr=0.01, momentum=0.9, type='SGD', weight_decay=0.0001),
     clip_grad=dict(max_norm=10, norm_type=2),
     type='OptimWrapper')
 
@@ -45,10 +45,9 @@ param_scheduler = [
         gamma=0.1,
         milestones=[
             8,
-            15,
-            23,
-            29,
-            35,
+            17,
+            28,
+            36,
         ],
         type='MultiStepLR'),
 ]

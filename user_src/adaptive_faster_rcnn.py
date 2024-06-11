@@ -12,7 +12,7 @@ from mmdet.utils import ConfigType, OptConfigType, OptMultiConfig
 from mmdet.models.detectors.base import BaseDetector
 from mmengine.logging import MMLogger
 
-from user_src.custom_module import  PolicyNet, ChannelAttention, SpatialAttention
+from user_src.custom_module import  PolicyNet
 
 @MODELS.register_module()
 class AdaptiveModel(BaseDetector):
@@ -24,7 +24,7 @@ class AdaptiveModel(BaseDetector):
 
     def __init__(self,
                  backbone: ConfigType,
-                 feature_layers: ConfigType,
+                #  feature_layers: ConfigType,
                  fusion_layers: ConfigType,
                  loss_policy:ConfigType,
                  neck: OptConfigType = None,
@@ -39,11 +39,6 @@ class AdaptiveModel(BaseDetector):
         
         self.backbone_rgb = MODELS.build(backbone)
         self.backbone_ir = MODELS.build(backbone)
-
-        # self.feature_rgb = MODELS.build(feature_layers)
-        # self.feature_ir = MODELS.build(feature_layers)
-
-        # self.policy_net = PolicyNet(in_channels=2560)
 
         self.fusion_layers = MODELS.build(fusion_layers)
 
@@ -172,13 +167,6 @@ class AdaptiveModel(BaseDetector):
         batch_inputs_rgb = batch_inputs[:, :3, :, :]
         batch_inputs_ir = batch_inputs[:, 3:, :, :]
 
-        # features_rgb = self.feature_rgb(batch_inputs_rgb)
-        # features_ir = self.feature_ir(batch_inputs_ir)
-        # selections = self.policy_net(features_rgb[0], features_ir[0])
-        # batch_inputs_rgb = self.judge(selections[0], batch_inputs_rgb)
-        # batch_inputs_ir = self.judge(selections[1], batch_inputs_ir)
-        # # selection = torch.tensor([[0., 1.], [1., 1.]], device=batch_inputs_rgb.device)
-
         x_rgb = self.backbone_rgb(batch_inputs_rgb)
         x_ir = self.backbone_ir(batch_inputs_ir)
 
@@ -194,7 +182,6 @@ class AdaptiveModel(BaseDetector):
             out_rgb = self.judge(selections[0], x_rgb[i])
             out_ir = self.judge(selections[1], x_ir[i])
             out = torch.cat((out_rgb, out_ir), dim=1)
-            # out = torch.cat((x_rgb[i], x_ir[i]), dim=1)
             out = self.fusion_layers(out, i)
             x_fuse.append(out)
         x_fuse = tuple(x_fuse)

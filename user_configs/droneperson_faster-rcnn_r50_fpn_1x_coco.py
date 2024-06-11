@@ -31,7 +31,7 @@ model = dict(
         num_outs=4,
         out_channels=[256, 512, 1024, 2048],
         # out_channels=[256, 256, 256, 256],
-        fusion_pattern='C3'),
+        fusion_pattern='AC3'),
     roi_head=dict(
         bbox_roi_extractor=dict(featmap_strides=[4, 8, 16]),
         bbox_head=dict(

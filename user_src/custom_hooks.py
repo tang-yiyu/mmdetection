@@ -254,8 +254,9 @@ class AdjustModeHook(Hook):
                 print("Warmup Training")
 
             # Prepare training
-            elif epoch == warmup_epoch:
-                print("Prepare Training")
+            elif epoch >= warmup_epoch and epoch < prepare_epoch:
+                if epoch == warmup_epoch:
+                    print("Prepare Training")
                 self.freeze_policy_net()
                 self.unfreeze_main_net()
                 # for k,v in self.model.named_parameters():
@@ -282,8 +283,9 @@ class AdjustModeHook(Hook):
                     self.unfreeze_main_net()
             
             # Finetune training
-            elif epoch == alternate_epoch:
-                print("Finetune Training")
+            elif epoch >= alternate_epoch:
+                if epoch == alternate_epoch:
+                    print("Finetune Training")
                 self.freeze_policy_net()
                 self.unfreeze_main_net()
             

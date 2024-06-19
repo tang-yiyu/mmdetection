@@ -5,6 +5,9 @@ from typing import List, Tuple, Union
 import torch
 import torch.nn as nn
 from torch import Tensor
+# from torchvision import transforms  
+# from PIL import Image 
+# import matplotlib.pyplot as plt
 
 from mmdet.registry import MODELS
 from mmdet.structures import SampleList
@@ -179,8 +182,20 @@ class AdaptiveModel(BaseDetector):
         for i in range(len(x_rgb)):
             selections = self.selection_layers[i](x_rgb[i], x_ir[i])
             selections_set.append(selections)
+            # print("origin_1:")
+            # img_rgb = Image.fromarray(x_rgb[i][0,0,:,:].clamp(0, 1).cpu().numpy(), mode='RGB')
+            # img_rgb.save(f'origin_1_in_rgb_{i}.png')
+            # img_ir = Image.fromarray(x_ir[i][0,0,:,:].clamp(0, 1).cpu().numpy(), mode='RGB')
+            # img_ir.save(f'origin_1_in_ir_{i}.png')
             out_rgb = self.judge(selections[0], x_rgb[i])
             out_ir = self.judge(selections[1], x_ir[i])
+            # print("policy_module_1:")
+            # print(selections)
+            # print(torch.all(out_ir == 0))
+            # img_rgb = Image.fromarray(out_rgb[0,0,:,:].clamp(0, 1).cpu().numpy(), mode='RGB')
+            # img_rgb.save(f'policy_1_out_rgb_{i}.png')
+            # img_ir = Image.fromarray(out_ir[0,0,:,:].clamp(0, 1).cpu().numpy(), mode='RGB')
+            # img_ir.save(f'policy_1_out_ir_{i}.png')
             out = torch.cat((out_rgb, out_ir), dim=1)
             out = self.fusion_layers(out, i)
             x_fuse.append(out)
@@ -357,6 +372,13 @@ class AdaptiveModel(BaseDetector):
             decisions_set.append(decisions)
             out_rgb = self.judge(decisions[0], x_rgb[i])
             out_ir = self.judge(decisions[1], x_ir[i])
+            # print("policy_module_2:")
+            # print(decisions)
+            # print(torch.all(out_ir == 0))
+            # img_rgb = Image.fromarray(out_rgb[0,0,:,:].clamp(0, 1).cpu().numpy(), mode='RGB')
+            # img_rgb.save(f'policy_2_out_rgb_{i}.png')
+            # img_ir = Image.fromarray(out_ir[0,0,:,:].clamp(0, 1).cpu().numpy(), mode='RGB')
+            # img_ir.save(f'policy_2_out_ir_{i}.png')
             out = out_rgb + out_ir
             x.append(out)
         x = tuple(x)
@@ -370,11 +392,6 @@ class AdaptiveModel(BaseDetector):
         # logger.info(f'Decisions')
         # for i, decision_result in enumerate(decisions_set):
         #     logger.info(f'Decisions {i}: {decision_result}')
-            # if i == 0:
-            #     contains_zero = (decision_result == 0)
-            #     contains_zero_any = contains_zero.any()
-            #     if contains_zero_any == True:
-            #         logger.info(f'Decisions {i}: {decision_result}')
 
         return batch_data_samples
  

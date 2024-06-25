@@ -6,14 +6,15 @@ custom_imports = dict(
              'user_src.two_stream_faster_rcnn', 
              'user_src.custom_hooks', 
              'user_src.custom_evaluator', 
-             'user_src.custom_module'], 
+             'user_src.custom_module',
+             'user_src.custom_visualization',], 
     allow_failed_imports=False)
 
 image_size=(640, 512)
 dataset_type = 'CocoDataset'
 classes = ('person', 'rider', 'crowd')
 data_root = 'data/DronePerson/'
-work_dir = './work_dirs/droneperson_anchor2_faster-rcnn_r50_fpn_1x_coco/'
+work_dir = './work_dirs/droneperson_nopolicy2_faster-rcnn_r50_fpn_1x_coco/'
 randomness = dict(seed=608238547)
 
 default_hooks = dict(
@@ -80,6 +81,7 @@ train_pipeline = [
     #     recompute_bbox=True,
     #     allow_negative_crop=True),
     dict(type='RandomErasingTwoStream', n_patches=(1, 5), ratio=(0.02, 0.2), squared=False),
+    dict(keep_ratio=True, scale=image_size, type='ResizeTwoStream'),
     # dict(
     #     type='RandomResize',
     #     scale=image_size,
@@ -157,6 +159,7 @@ test_pipeline = [
 ]
 
 test_dataloader = dict(
+    batch_size=2,
     dataset=dict(
         ann_file='annotations/test.json',
         backend_args=None,
@@ -167,3 +170,10 @@ test_dataloader = dict(
         metainfo=dict(classes=classes),
         type='CocoDataset')
     )
+
+visualizer = dict(
+    name='visualizer',
+    type='TwoStreamDetLocalVisualizer',
+    vis_backends=[
+        dict(type='LocalVisBackend'),
+    ])

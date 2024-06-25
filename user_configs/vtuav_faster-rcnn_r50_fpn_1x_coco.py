@@ -6,7 +6,8 @@ custom_imports = dict(
              'user_src.two_stream_faster_rcnn', 
              'user_src.custom_hooks', 
              'user_src.custom_evaluator', 
-             'user_src.custom_module'], 
+             'user_src.custom_module',
+             'user_src.custom_visualization',], 
     allow_failed_imports=False)
 
 image_size=(960, 540)
@@ -14,8 +15,8 @@ image_size=(960, 540)
 dataset_type = 'CocoDataset'
 classes = ('person')
 data_root = 'data/VTUAV/'
-work_dir = './work_dirs/vtuav_anchor_faster-rcnn_r50_fpn_1x_coco/'
-randomness = dict(seed=1539225152)
+work_dir = './work_dirs/vtuav_nopolicy_faster-rcnn_r50_fpn_1x_coco/'
+# randomness = dict(seed=1539225152)
 
 default_hooks = dict(
     checkpoint=dict(interval=1, save_best='coco/bbox_mAP_50', rule='greater', type='CheckpointHook'),
@@ -32,7 +33,7 @@ model = dict(
         num_outs=4,
         out_channels=[256, 512, 1024, 2048],
         # out_channels=[256, 256, 256, 256],
-        fusion_pattern='AC3'),
+        fusion_pattern='Conv'),
     roi_head=dict(
         bbox_roi_extractor=dict(featmap_strides=[4, 8, 16]),
         bbox_head=dict(
@@ -45,6 +46,7 @@ model = dict(
                 1.0,
             ],
             scales=[
+                1,
                 2,
                 8,
             ],
@@ -71,7 +73,6 @@ train_cfg = dict(max_epochs=20, type='EpochBasedTrainLoop', val_interval=1)
 train_pipeline = [
     dict(backend_args=None, type='LoadTwoStreamImageFromFiles'),
     dict(type='LoadAnnotations', with_bbox=True),
-    # dict(keep_ratio=True, scale=image_size, type='ResizeTwoStream'),
     # dict(
     #     type='RandomCropTwoStream',
     #     crop_type='absolute_range',
@@ -155,8 +156,9 @@ test_pipeline = [
         ),
         type='PackDetInputsTwoStream'),
 ]
-
+    
 test_dataloader = dict(
+    batch_size=2,
     dataset=dict(
         ann_file='annotations/test.json',
         backend_args=None,
@@ -167,3 +169,10 @@ test_dataloader = dict(
         metainfo=dict(classes=classes),
         type='CocoDataset')
     )
+
+visualizer = dict(
+    name='visualizer',
+    type='TwoStreamDetLocalVisualizer',
+    vis_backends=[
+        dict(type='LocalVisBackend'),
+    ])

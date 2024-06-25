@@ -7,14 +7,15 @@ custom_imports = dict(
              'user_src.custom_hooks', 
              'user_src.custom_evaluator', 
              'user_src.custom_module',
-             'user_src.custom_loss'], 
+             'user_src.custom_loss',
+             'user_src.custom_visualization',], 
     allow_failed_imports=False)
 
 custom_hooks = [
     dict(type='AdjustModeHook')
 ]
 
-work_dir = './work_dirs/adaptive_model_droneperson_selection9_faster-rcnn_r50_fpn_1x_coco/'
+work_dir = './work_dirs/droneperson_policy2_faster-rcnn_r50_fpn_1x_coco/'
 
 train_dataloader = dict(
     batch_size=2,)
@@ -30,11 +31,6 @@ model = dict(
     #         type='Pretrained', checkpoint='open-mmlab://mmdet/mobilenet_v2'),
     # ),
     loss_policy=dict(loss_weight=0.001, type='PolicyLoss'),
-    # train_cfg=dict(
-    #     rcnn=dict(
-    #         assigner=dict(_delete_=True, type='ATSSAssigner', topk=9)),
-    #     rpn=dict(
-    #         assigner=dict(_delete_=True, type='ATSSAssigner', topk=9))),
     type='AdaptiveModel')
 
 optim_wrapper = dict(

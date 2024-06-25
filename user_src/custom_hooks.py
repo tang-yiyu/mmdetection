@@ -59,6 +59,7 @@ class TwoStreamDetVisualizationHook(DetVisualizationHook):
                 osp.basename(img_path_rgb) if self.show else 'val_img',
                 img_rgb,
                 data_sample=outputs[0],
+                draw_gt = False,
                 show=self.show,
                 wait_time=self.wait_time,
                 pred_score_thr=self.score_thr,
@@ -73,6 +74,7 @@ class TwoStreamDetVisualizationHook(DetVisualizationHook):
                 osp.basename(img_path_ir) if self.show else 'val_img',
                 img_ir,
                 data_sample=outputs[0],
+                draw_gt = False,
                 show=self.show,
                 wait_time=self.wait_time,
                 pred_score_thr=self.score_thr,
@@ -125,6 +127,7 @@ class TwoStreamDetVisualizationHook(DetVisualizationHook):
                 osp.basename(img_path_rgb) if self.show else 'test_img',
                 img_rgb,
                 data_sample=data_sample,
+                draw_gt = False,
                 show=self.show,
                 wait_time=self.wait_time,
                 pred_score_thr=self.score_thr,
@@ -144,6 +147,7 @@ class TwoStreamDetVisualizationHook(DetVisualizationHook):
                 osp.basename(img_path_ir) if self.show else 'test_img',
                 img_ir,
                 data_sample=data_sample,
+                draw_gt = False,
                 show=self.show,
                 wait_time=self.wait_time,
                 pred_score_thr=self.score_thr,
@@ -169,9 +173,9 @@ class AdjustModeHook(Hook):
             for param in selection_layer.parameters():
                 param.requires_grad = False
 
-        for policy_layer in self.model.policy_layers:
-            for param in policy_layer.parameters():
-                param.requires_grad = False
+        # for policy_layer in self.model.policy_layers:
+        #     for param in policy_layer.parameters():
+        #         param.requires_grad = False
 
     def unfreeze_policy_net(self):
         self.model.update_policy_net = True
@@ -188,9 +192,9 @@ class AdjustModeHook(Hook):
             for param in selection_layer.parameters():
                 param.requires_grad = True
             
-        for policy_layer in self.model.policy_layers:
-            for param in policy_layer.parameters():
-                param.requires_grad = True
+        # for policy_layer in self.model.policy_layers:
+        #     for param in policy_layer.parameters():
+        #         param.requires_grad = True
 
     def freeze_main_net(self):
         self.model.update_main_net = False
@@ -275,8 +279,8 @@ class AdjustModeHook(Hook):
                         # self.model.policy_net.decay_temperature(0.85)
                         for selection_layer in self.model.selection_layers:
                             selection_layer.decay_temperature(0.85)
-                        for policy_layer in self.model.policy_layers:
-                            policy_layer.decay_temperature(0.85)
+                        # for policy_layer in self.model.policy_layers:
+                        #     policy_layer.decay_temperature(0.85)
                 elif ((epoch - prepare_epoch) % 2 == 0) and ((epoch - prepare_epoch) % 4 != 0):
                     print("Update MainNet")
                     self.freeze_policy_net()

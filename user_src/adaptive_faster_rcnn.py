@@ -1,13 +1,13 @@
 import copy
 import warnings
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Optional
 
 import torch
 import torch.nn as nn
+import mmcv
 from torch import Tensor
-# from torchvision import transforms  
-# from PIL import Image 
-# import matplotlib.pyplot as plt
+from mmengine.visualization.visualizer import Visualizer
+import numpy as np
 
 from mmdet.registry import MODELS
 from mmdet.structures import SampleList
@@ -58,12 +58,12 @@ class AdaptiveModel(BaseDetector):
             self.neck_ir = MODELS.build(neck)
             self.neck_fuse = MODELS.build(neck)
 
-        self.policy_layers = []
-        for i in range(neck.num_outs):
-            policy_layer = PolicyNet(in_channels=512, out_feature_c=256)
-            policy_layer_name = f'policy_layer{i}'
-            self.add_module(policy_layer_name, policy_layer)
-            self.policy_layers.append(policy_layer)
+        # self.policy_layers = []
+        # for i in range(neck.num_outs):
+        #     policy_layer = PolicyNet(in_channels=512, out_feature_c=256)
+        #     policy_layer_name = f'policy_layer{i}'
+        #     self.add_module(policy_layer_name, policy_layer)
+        #     self.policy_layers.append(policy_layer)
 
         if rpn_head is not None:
             rpn_train_cfg = train_cfg.rpn if train_cfg is not None else None
@@ -144,7 +144,17 @@ class AdaptiveModel(BaseDetector):
         for i in range(input.shape[0]):
             output[i, :, :, :] = decision[i] * input[i, :, :, :]
         return output
-
+    
+    def draw_featmap(self, featmap: Tensor, out_file: Optional[str] = None):
+        visualizer = Visualizer()
+        drawn_img = visualizer.draw_featmap(featmap=featmap, channel_reduction='squeeze_mean')
+        
+        if out_file is not None:
+            mmcv.imwrite(drawn_img[..., ::-1], out_file)
+        else:
+            visualizer.add_image('feat', drawn_img)
+        
+    
     def compute_policy_loss(self, decisions_set, losses):
         policy_losses = self.loss_policy(decisions_set, losses)
         return dict(
@@ -163,7 +173,8 @@ class AdaptiveModel(BaseDetector):
                 different resolutions.
             x_ir: tuple[Tensor]: Multi-level features that may have
                 different resolutions.
-            decisions: Tensor: exp: torch.tensor([[0., 1.], [1., 1.]]) for batch_size = 2
+            selections_set: List[Tensor]: List of decisions. 
+                Decisions exp: torch.tensor([[0., 1.], [1., 1.]]) for batch_size = 2
                 or torch.tensor([[0., 1., 0., 1.], [1., 1., 0., 1.]]) for batch_size = 4
                 decisions[0] represents RGB stream, decisions[1] represents IR stream.
         """
@@ -177,29 +188,42 @@ class AdaptiveModel(BaseDetector):
             raise ValueError('The length of rgb feature and ir feature should be the same.')
         
         selections_set = []
-        # selections_set.append(selections)
         x_fuse = []
+        # x_rgb_out = []
+        # x_ir_out = []
+        
         for i in range(len(x_rgb)):
             selections = self.selection_layers[i](x_rgb[i], x_ir[i])
             selections_set.append(selections)
-            # print("origin_1:")
-            # img_rgb = Image.fromarray(x_rgb[i][0,0,:,:].clamp(0, 1).cpu().numpy(), mode='RGB')
-            # img_rgb.save(f'origin_1_in_rgb_{i}.png')
-            # img_ir = Image.fromarray(x_ir[i][0,0,:,:].clamp(0, 1).cpu().numpy(), mode='RGB')
-            # img_ir.save(f'origin_1_in_ir_{i}.png')
             out_rgb = self.judge(selections[0], x_rgb[i])
             out_ir = self.judge(selections[1], x_ir[i])
-            # print("policy_module_1:")
-            # print(selections)
-            # print(torch.all(out_ir == 0))
-            # img_rgb = Image.fromarray(out_rgb[0,0,:,:].clamp(0, 1).cpu().numpy(), mode='RGB')
-            # img_rgb.save(f'policy_1_out_rgb_{i}.png')
-            # img_ir = Image.fromarray(out_ir[0,0,:,:].clamp(0, 1).cpu().numpy(), mode='RGB')
-            # img_ir.save(f'policy_1_out_ir_{i}.png')
+
+            # # Draw feature map
+            # ori_feat_rgb_name = "rgb_" + str(i) + "_ori_feat.jpg"
+            # self.draw_featmap(x_rgb[i][0], ori_feat_rgb_name)
+            # ori_feat_ir_name = "ir_" + str(i) + "_ori_feat.jpg"
+            # self.draw_featmap(x_ir[i][0], ori_feat_ir_name)
+
+            # # Draw feature map after policy module
+            # mod_feat_rgb_name = "rgb_" + str(i) + "_mod_feat.jpg"
+            # self.draw_featmap(out_rgb[0], mod_feat_rgb_name)
+            # mod_feat_ir_name = "ir_" + str(i) + "_mod_feat.jpg"
+            # self.draw_featmap(out_ir[0], mod_feat_ir_name)
+
             out = torch.cat((out_rgb, out_ir), dim=1)
             out = self.fusion_layers(out, i)
+            # out = out_rgb + out_ir
+
+            # # Draw feature map after fusion module
+            # fuse_feat_name = "fuse_" + str(i) + "_feat.jpg"
+            # self.draw_featmap(out[0], fuse_feat_name)
+
             x_fuse.append(out)
+            # x_rgb_out.append(out_rgb)
+            # x_ir_out.append(out_ir)
         x_fuse = tuple(x_fuse)
+        # x_rgb_out = tuple(x_rgb_out)
+        # x_ir_out = tuple(x_ir_out)
 
         if self.with_neck:
             x_rgb = self.neck_rgb(x_rgb)
@@ -237,10 +261,11 @@ class AdaptiveModel(BaseDetector):
 
         x = []
         for i in range(len(x_rgb)):
-            decisions = self.policy_layers[i](x_rgb[i], x_ir[i])
-            out_rgb = self.judge(decisions[0], x_rgb[i])
-            out_ir = self.judge(decisions[1], x_ir[i])
-            out = out_rgb + out_ir
+            # decisions = self.policy_layers[i](x_rgb[i], x_ir[i])
+            # out_rgb = self.judge(decisions[0], x_rgb[i])
+            # out_ir = self.judge(decisions[1], x_ir[i])
+            # out = out_rgb + out_ir
+            out = x_rgb[i] + x_ir[i]
             x.append(out)
         x = tuple(x)
         roi_outs = self.roi_head.forward(x, rpn_results_list,
@@ -299,11 +324,12 @@ class AdaptiveModel(BaseDetector):
 
         x = []
         for i in range(len(x_rgb)):
-            decisions = self.policy_layers[i](x_rgb[i], x_ir[i])
-            decisions_set.append(decisions)
-            out_rgb = self.judge(decisions[0], x_rgb[i])
-            out_ir = self.judge(decisions[1], x_ir[i])
-            out = out_rgb + out_ir
+            # decisions = self.policy_layers[i](x_rgb[i], x_ir[i])
+            # decisions_set.append(decisions)
+            # out_rgb = self.judge(decisions[0], x_rgb[i])
+            # out_ir = self.judge(decisions[1], x_ir[i])
+            # out = out_rgb + out_ir
+            out = x_rgb[i] + x_ir[i]
             x.append(out)
         x = tuple(x)
 
@@ -368,18 +394,12 @@ class AdaptiveModel(BaseDetector):
 
         x = []
         for i in range(len(x_rgb)):
-            decisions = self.policy_layers[i](x_rgb[i], x_ir[i])
-            decisions_set.append(decisions)
-            out_rgb = self.judge(decisions[0], x_rgb[i])
-            out_ir = self.judge(decisions[1], x_ir[i])
-            # print("policy_module_2:")
-            # print(decisions)
-            # print(torch.all(out_ir == 0))
-            # img_rgb = Image.fromarray(out_rgb[0,0,:,:].clamp(0, 1).cpu().numpy(), mode='RGB')
-            # img_rgb.save(f'policy_2_out_rgb_{i}.png')
-            # img_ir = Image.fromarray(out_ir[0,0,:,:].clamp(0, 1).cpu().numpy(), mode='RGB')
-            # img_ir.save(f'policy_2_out_ir_{i}.png')
-            out = out_rgb + out_ir
+            # decisions = self.policy_layers[i](x_rgb[i], x_ir[i])
+            # decisions_set.append(decisions)
+            # out_rgb = self.judge(decisions[0], x_rgb[i])
+            # out_ir = self.judge(decisions[1], x_ir[i])
+            # out = out_rgb + out_ir
+            out = x_rgb[i] + x_ir[i]
             x.append(out)
         x = tuple(x)
 

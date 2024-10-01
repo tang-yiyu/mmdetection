@@ -15,7 +15,7 @@ custom_hooks = [
     dict(type='AdjustModeHook')
 ]
 
-work_dir = './work_dirs/vtuav_fusion_conv3_faster-rcnn_r50_fpn_1x_coco/'
+work_dir = './work_dirs/vtuav_policy2_faster-rcnn_r50_fpn_1x_coco/'
 
 train_dataloader = dict(
     batch_size=2,)

@@ -1,24 +1,18 @@
 import copy
 import warnings
-from typing import List, Tuple, Union, Optional
+from typing import List, Tuple, Union
 
 import torch
-import torch.nn as nn
-import mmcv
 from torch import Tensor
-from mmengine.visualization.visualizer import Visualizer
-import numpy as np
 
 from mmdet.registry import MODELS
 from mmdet.structures import SampleList
 from mmdet.utils import ConfigType, OptConfigType, OptMultiConfig
 from mmdet.models.detectors.base import BaseDetector
-from mmengine.logging import MMLogger
 
-from user_src.custom_module import  PolicyNet
 
 @MODELS.register_module()
-class AdaptiveModel(BaseDetector):
+class TwoStreamTwoStageDetetor(BaseDetector):
     """Base class for two-stage detectors.
 
     Two-stage detectors typically consisting of a region proposal network and a
@@ -27,9 +21,7 @@ class AdaptiveModel(BaseDetector):
 
     def __init__(self,
                  backbone: ConfigType,
-                #  feature_layers: ConfigType,
                  fusion_layers: ConfigType,
-                 loss_policy:ConfigType,
                  neck: OptConfigType = None,
                  rpn_head: OptConfigType = None,
                  roi_head: OptConfigType = None,
@@ -45,25 +37,10 @@ class AdaptiveModel(BaseDetector):
 
         self.fusion_layers = MODELS.build(fusion_layers)
 
-        self.selection_layers = []
-        for i in range(fusion_layers.num_outs):
-            selection_layer = PolicyNet(in_channels=2*fusion_layers.out_channels[i],
-                                        out_feature_c=fusion_layers.out_channels[i])     
-            selection_layer_name = f'selection_layer{i}'
-            self.add_module(selection_layer_name, selection_layer)
-            self.selection_layers.append(selection_layer)
-
         if neck is not None:
             self.neck_rgb = MODELS.build(neck)
             self.neck_ir = MODELS.build(neck)
             self.neck_fuse = MODELS.build(neck)
-
-        # self.policy_layers = []
-        # for i in range(neck.num_outs):
-        #     policy_layer = PolicyNet(in_channels=512, out_feature_c=256)
-        #     policy_layer_name = f'policy_layer{i}'
-        #     self.add_module(policy_layer_name, policy_layer)
-        #     self.policy_layers.append(policy_layer)
 
         if rpn_head is not None:
             rpn_train_cfg = train_cfg.rpn if train_cfg is not None else None
@@ -88,14 +65,9 @@ class AdaptiveModel(BaseDetector):
             roi_head.update(train_cfg=rcnn_train_cfg)
             roi_head.update(test_cfg=test_cfg.rcnn)
             self.roi_head = MODELS.build(roi_head)
-        
+
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
-
-        self.loss_policy = MODELS.build(loss_policy)
-
-        self.update_policy_net = True
-        self.update_main_net = True
 
     def _load_from_state_dict(self, state_dict: dict, prefix: str,
                               local_metadata: dict, strict: bool,
@@ -136,30 +108,6 @@ class AdaptiveModel(BaseDetector):
         """bool: whether the detector has a RoI head"""
         return hasattr(self, 'roi_head') and self.roi_head is not None
 
-    def judge(self, decision: Tensor, input: Tensor) -> Tensor:
-        """
-        Determine whether to discard an input path.
-        """
-        output = torch.zeros_like(input)
-        for i in range(input.shape[0]):
-            output[i, :, :, :] = decision[i] * input[i, :, :, :]
-        return output
-    
-    def draw_featmap(self, featmap: Tensor, out_file: Optional[str] = None):
-        visualizer = Visualizer()
-        drawn_img = visualizer.draw_featmap(featmap=featmap, channel_reduction='squeeze_mean')
-        
-        if out_file is not None:
-            mmcv.imwrite(drawn_img[..., ::-1], out_file)
-        else:
-            visualizer.add_image('feat', drawn_img)
-        
-    
-    def compute_policy_loss(self, decisions_set, losses):
-        policy_losses = self.loss_policy(decisions_set, losses)
-        return dict(
-            loss_policy=policy_losses)
-
     def extract_feat(self, batch_inputs: Tensor) -> Tuple[Tensor]:
         """Extract features.
 
@@ -167,16 +115,8 @@ class AdaptiveModel(BaseDetector):
             batch_inputs (Tensor): Image tensor with shape (N, C, H ,W).
 
         Returns:
-            x_fuse: tuple[Tensor]: Multi-level features that may have
-                different resolutions.
-            x_rgb: tuple[Tensor]: Multi-level features that may have
-                different resolutions.
-            x_ir: tuple[Tensor]: Multi-level features that may have
-                different resolutions.
-            selections_set: List[Tensor]: List of decisions. 
-                Decisions exp: torch.tensor([[0., 1.], [1., 1.]]) for batch_size = 2
-                or torch.tensor([[0., 1., 0., 1.], [1., 1., 0., 1.]]) for batch_size = 4
-                decisions[0] represents RGB stream, decisions[1] represents IR stream.
+            tuple[Tensor]: Multi-level features that may have
+            different resolutions.
         """
         batch_inputs_rgb = batch_inputs[:, :3, :, :]
         batch_inputs_ir = batch_inputs[:, 3:, :, :]
@@ -186,59 +126,20 @@ class AdaptiveModel(BaseDetector):
 
         if len(x_rgb) != len(x_ir):
             raise ValueError('The length of rgb feature and ir feature should be the same.')
-        
-        selections_set = []
+
         x_fuse = []
-        # x_rgb_out = []
-        # x_ir_out = []
-        
-        # print('--------------------\n')
         for i in range(len(x_rgb)):
-            selections = self.selection_layers[i](x_rgb[i], x_ir[i])
-            selections_set.append(selections)
-            out_rgb = self.judge(selections[0], x_rgb[i])
-            out_ir = self.judge(selections[1], x_ir[i])
-
-            # out_rgb = x_rgb[i]
-            # out_ir = x_ir[i]
-
-            # Draw feature map
-            ori_feat_rgb_name = "rgb_" + str(i) + "_ori_feat.jpg"
-            self.draw_featmap(x_rgb[i][0], ori_feat_rgb_name)
-            ori_feat_ir_name = "ir_" + str(i) + "_ori_feat.jpg"
-            self.draw_featmap(x_ir[i][0], ori_feat_ir_name)
-
-            # Draw feature map after policy module
-            policy_feat_rgb_name = "rgb_" + str(i) + "_policy_feat.jpg"
-            self.draw_featmap(out_rgb[0], policy_feat_rgb_name)
-            policy_feat_ir_name = "ir_" + str(i) + "_policy_feat.jpg"
-            self.draw_featmap(out_ir[0], policy_feat_ir_name)
-
-            # # Print decisions
-            # print(selections)
-
-            out = torch.cat((out_rgb, out_ir), dim=1)
+            out = torch.cat((x_rgb[i], x_ir[i]), dim=1)
             out = self.fusion_layers(out, i)
-            # out = out_rgb + out_ir
-            # out = torch.max(out_rgb, out_ir)
-
-            # Draw feature map after fusion module
-            fuse_feat_name = "fuse_" + str(i) + "_feat.jpg"
-            self.draw_featmap(out[0], fuse_feat_name)
-
             x_fuse.append(out)
-            # x_rgb_out.append(out_rgb)
-            # x_ir_out.append(out_ir)
         x_fuse = tuple(x_fuse)
-        # x_rgb_out = tuple(x_rgb_out)
-        # x_ir_out = tuple(x_ir_out)
 
         if self.with_neck:
             x_rgb = self.neck_rgb(x_rgb)
             x_ir = self.neck_ir(x_ir)
             x_fuse = self.neck_fuse(x_fuse)
         
-        return x_rgb, x_ir, x_fuse, selections_set
+        return x_rgb, x_ir, x_fuse
 
     def _forward(self, batch_inputs: Tensor,
                  batch_data_samples: SampleList) -> tuple:
@@ -256,7 +157,7 @@ class AdaptiveModel(BaseDetector):
             forward.
         """
         results = ()
-        x_rgb, x_ir, x_fuse, _ = self.extract_feat(batch_inputs)
+        x_rgb, x_ir, x_fuse = self.extract_feat(batch_inputs)
 
         if self.with_rpn:
             rpn_results_list = self.rpn_head.predict(
@@ -266,13 +167,8 @@ class AdaptiveModel(BaseDetector):
             rpn_results_list = [
                 data_sample.proposals for data_sample in batch_data_samples
             ]
-
         x = []
         for i in range(len(x_rgb)):
-            # decisions = self.policy_layers[i](x_rgb[i], x_ir[i])
-            # out_rgb = self.judge(decisions[0], x_rgb[i])
-            # out_ir = self.judge(decisions[1], x_ir[i])
-            # out = out_rgb + out_ir
             out = x_rgb[i] + x_ir[i]
             x.append(out)
         x = tuple(x)
@@ -284,8 +180,6 @@ class AdaptiveModel(BaseDetector):
     def loss(self, batch_inputs: Tensor,
              batch_data_samples: SampleList) -> dict:
         """Calculate losses from a batch of inputs and data samples.
-           
-        Use for train process.
 
         Args:
             batch_inputs (Tensor): Input images of shape (N, C, H, W).
@@ -297,11 +191,8 @@ class AdaptiveModel(BaseDetector):
         Returns:
             dict: A dictionary of loss components
         """
-        x_rgb, x_ir, x_fuse, selection_set = self.extract_feat(batch_inputs)
-        
-        decisions_set = []
-        for selections in selection_set:
-            decisions_set.append(selections)
+        x_rgb, x_ir, x_fuse = self.extract_feat(batch_inputs)
+
         losses = dict()
 
         # RPN forward and loss
@@ -329,25 +220,14 @@ class AdaptiveModel(BaseDetector):
             rpn_results_list = [
                 data_sample.proposals for data_sample in batch_data_samples
             ]
-
         x = []
         for i in range(len(x_rgb)):
-            # decisions = self.policy_layers[i](x_rgb[i], x_ir[i])
-            # decisions_set.append(decisions)
-            # out_rgb = self.judge(decisions[0], x_rgb[i])
-            # out_ir = self.judge(decisions[1], x_ir[i])
-            # out = out_rgb + out_ir
             out = x_rgb[i] + x_ir[i]
             x.append(out)
         x = tuple(x)
-
         roi_losses = self.roi_head.loss(x, rpn_results_list,
                                         batch_data_samples)
         losses.update(roi_losses)
-
-        if self.update_policy_net == True:
-            policy_losses = self.compute_policy_loss(decisions_set, losses['loss_cls'] + losses['loss_bbox'])
-            losses.update(policy_losses)
 
         return losses
 
@@ -357,8 +237,6 @@ class AdaptiveModel(BaseDetector):
                 rescale: bool = True) -> SampleList:
         """Predict results from a batch of inputs and data samples with post-
         processing.
-
-        Use for val and test procedures which do not need to compute loss.
 
         Args:
             batch_inputs (Tensor): Inputs with shape (N, C, H, W).
@@ -382,14 +260,9 @@ class AdaptiveModel(BaseDetector):
                     the last dimension 4 arrange as (x1, y1, x2, y2).
                 - masks (Tensor): Has a shape (num_instances, H, W).
         """
-        logger = MMLogger.get_instance(name='MMLogger')
 
         assert self.with_bbox, 'Bbox head must be implemented.'
-        x_rgb, x_ir, x_fuse, selection_set = self.extract_feat(batch_inputs)
-
-        decisions_set = []
-        for selections in selection_set:
-            decisions_set.append(selections)
+        x_rgb, x_ir, x_fuse = self.extract_feat(batch_inputs)
 
         # If there are no pre-defined proposals, use RPN to get proposals
         if batch_data_samples[0].get('proposals', None) is None:
@@ -399,27 +272,14 @@ class AdaptiveModel(BaseDetector):
             rpn_results_list = [
                 data_sample.proposals for data_sample in batch_data_samples
             ]
-
         x = []
         for i in range(len(x_rgb)):
-            # decisions = self.policy_layers[i](x_rgb[i], x_ir[i])
-            # decisions_set.append(decisions)
-            # out_rgb = self.judge(decisions[0], x_rgb[i])
-            # out_ir = self.judge(decisions[1], x_ir[i])
-            # out = out_rgb + out_ir
             out = x_rgb[i] + x_ir[i]
             x.append(out)
         x = tuple(x)
-
         results_list = self.roi_head.predict(
             x, rpn_results_list, batch_data_samples, rescale=rescale)
 
         batch_data_samples = self.add_pred_to_datasample(
             batch_data_samples, results_list)
-        
-        # logger.info(f'Decisions')
-        # for i, decision_result in enumerate(decisions_set):
-        #     logger.info(f'Decisions {i}: {decision_result}')
-
         return batch_data_samples
- 

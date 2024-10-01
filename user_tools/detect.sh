@@ -25,7 +25,15 @@
 # CUDA_VISIBLE_DEVICES=0 python tools/test.py work_dirs/droneperson_policy_faster-rcnn_r50_fpn_1x_coco/adaptive_model_droneperson_faster-rcnn_r50_fpn_1x_coco.py work_dirs/droneperson_policy_faster-rcnn_r50_fpn_1x_coco/best_coco_bbox_mAP_50_epoch_7.pth --show-dir vis
 # CUDA_VISIBLE_DEVICES=2 python tools/test.py work_dirs/droneperson_policy_faster-rcnn_r50_fpn_1x_coco/adaptive_model_droneperson_faster-rcnn_r50_fpn_1x_coco.py work_dirs/droneperson_policy_faster-rcnn_r50_fpn_1x_coco/best_coco_bbox_mAP_50_epoch_7.pth --show-dir vis
 # CUDA_VISIBLE_DEVICES=2 python tools/test.py user_configs/adaptive_model_vtuav_faster-rcnn_r50_fpn_1x_coco.py work_dirs/vtuav_policy_faster-rcnn_r50_fpn_1x_coco/best_coco_bbox_mAP_50_epoch_9.pth --show-dir vis
-CUDA_VISIBLE_DEVICES=2 python tools/test.py work_dirs/droneperson_fusion_conv_faster-rcnn_r50_fpn_1x_coco/adaptive_model_droneperson_faster-rcnn_r50_fpn_1x_coco.py work_dirs/droneperson_fusion_conv_faster-rcnn_r50_fpn_1x_coco/best_coco_bbox_mAP_50_epoch_6.pth --show-dir vis
-CUDA_VISIBLE_DEVICES=2 python tools/test.py work_dirs/vtuav_fusion_conv_faster-rcnn_r50_fpn_1x_coco/adaptive_model_vtuav_faster-rcnn_r50_fpn_1x_coco.py work_dirs/vtuav_fusion_conv_faster-rcnn_r50_fpn_1x_coco/best_coco_bbox_mAP_50_epoch_12.pth --show-dir vis
 
 
+
+# CUDA_VISIBLE_DEVICES=2 python tools/test.py work_dirs/droneperson_policy_faster-rcnn_r50_fpn_1x_coco/adaptive_model_droneperson_faster-rcnn_r50_fpn_1x_coco.py work_dirs/droneperson_policy_faster-rcnn_r50_fpn_1x_coco/best_coco_bbox_mAP_50_epoch_7.pth --show-dir vis
+# CUDA_VISIBLE_DEVICES=0 python tools/test.py work_dirs/vtuav_policy_faster-rcnn_r50_fpn_1x_coco/adaptive_model_vtuav_faster-rcnn_r50_fpn_1x_coco.py work_dirs/vtuav_policy_faster-rcnn_r50_fpn_1x_coco/best_coco_bbox_mAP_50_epoch_9.pth --show-dir vis
+
+
+# CUDA_VISIBLE_DEVICES=2 python tools/test.py work_dirs/faster-rcnn-twostream_droneperson_final/faster-rcnn-twostream_droneperson.py work_dirs/faster-rcnn-twostream_droneperson_final/best_coco_bbox_mAP_50_epoch_6.pth --show-dir vis
+
+
+# CUDA_VISIBLE_DEVICES=1 python tools/test.py work_dirs/droneperson_baseline_new2_faster-rcnn_r50_fpn_1x_coco/droneperson_faster-rcnn_r50_fpn_1x_coco.py work_dirs/droneperson_baseline_new2_faster-rcnn_r50_fpn_1x_coco/best_coco_bbox_mAP_50_epoch_9.pth --show-dir vis
+# CUDA_VISIBLE_DEVICES=2 python tools/test.py work_dirs/vtuav_baseline_new2_faster-rcnn_r50_fpn_1x_coco/vtuav_faster-rcnn_r50_fpn_1x_coco.py work_dirs/vtuav_baseline_new2_faster-rcnn_r50_fpn_1x_coco/best_coco_bbox_mAP_50_epoch_9.pth --show-dir vis

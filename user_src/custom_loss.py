@@ -7,7 +7,7 @@ from typing import List, Dict
 from mmdet.registry import MODELS
 # from mmdet.models.losses.utils import weighted_loss
 
-def policy_loss(decisions_set: List, losses: Dict) -> Tensor:
+def policy_loss(decisions_set: List, incorrectness: Tensor) -> Tensor:
     """Policy loss.
 
      Args:
@@ -20,7 +20,6 @@ def policy_loss(decisions_set: List, losses: Dict) -> Tensor:
     policy_losses = []
     cost_weights = [1.0, 1.0] # The weight of each stream
     gammas = 10 # Penalize incorrect predictions
-    incorrectness = losses['loss_cls'] + losses['loss_bbox']
     correctness = torch.ones_like(incorrectness) - incorrectness
     for decisions in decisions_set:
         policy_loss = torch.tensor(0.0, dtype=decisions.dtype, device=decisions.device)

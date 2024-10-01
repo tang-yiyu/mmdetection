@@ -14,8 +14,9 @@ image_size=(640, 512)
 dataset_type = 'CocoDataset'
 classes = ('person', 'rider', 'crowd')
 data_root = 'data/DronePerson/'
-work_dir = './work_dirs/droneperson_nopolicy2_faster-rcnn_r50_fpn_1x_coco/'
-randomness = dict(seed=608238547)
+work_dir = './work_dirs/droneperson_baseline_new2_faster-rcnn_r50_fpn_1x_coco/'
+# randomness = dict(seed=608238547)
+# randomness = dict(seed=0)
 
 default_hooks = dict(
     checkpoint=dict(interval=1, save_best='coco/bbox_mAP_50', rule='greater', type='CheckpointHook'),

@@ -11,12 +11,12 @@ custom_imports = dict(
     allow_failed_imports=False)
 
 image_size=(960, 540)
-# image_size=(640, 512)
 dataset_type = 'CocoDataset'
 classes = ('person')
 data_root = 'data/VTUAV/'
-work_dir = './work_dirs/vtuav_nopolicy_faster-rcnn_r50_fpn_1x_coco/'
+work_dir = './work_dirs/vtuav_baseline_new2_faster-rcnn_r50_fpn_1x_coco/'
 # randomness = dict(seed=1539225152)
+# randomness = dict(seed=1291126409)
 
 default_hooks = dict(
     checkpoint=dict(interval=1, save_best='coco/bbox_mAP_50', rule='greater', type='CheckpointHook'),
@@ -33,7 +33,7 @@ model = dict(
         num_outs=4,
         out_channels=[256, 512, 1024, 2048],
         # out_channels=[256, 256, 256, 256],
-        fusion_pattern='Conv'),
+        fusion_pattern='AC3'),
     roi_head=dict(
         bbox_roi_extractor=dict(featmap_strides=[4, 8, 16]),
         bbox_head=dict(

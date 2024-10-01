@@ -134,7 +134,7 @@ class ResizeTwoStream(Resize):
                     interpolation=self.interpolation,
                     return_scale=True,
                     backend=self.backend)
-                img_ir, _ = mmcv.imresize(
+                img_ir, _, _ = mmcv.imresize(
                     results['img_ir'],
                     results['scale'],
                     interpolation=self.interpolation,

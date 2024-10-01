@@ -13,6 +13,22 @@ from mmengine.structures import InstanceData
 from mmdet.structures.det_data_sample import DetDataSample
 from mmengine.dist import master_only
 
+
+def bbox_iou(boxA, boxB):  
+    xA = torch.max(boxA[0], boxB[0])  
+    yA = torch.max(boxA[1], boxB[1])  
+    xB = torch.min(boxA[2], boxB[2])  
+    yB = torch.min(boxA[3], boxB[3])  
+  
+    interArea = torch.max(torch.tensor(0), xB - xA) * torch.max(torch.tensor(0), yB - yA)  
+  
+    boxAArea = (boxA[2] - boxA[0]) * (boxA[3] - boxA[1])  
+    boxBArea = (boxB[2] - boxB[0]) * (boxB[3] - boxB[1])  
+  
+    iou = interArea / (boxAArea + boxBArea - interArea)  
+  
+    return iou 
+
 @VISUALIZERS.register_module()
 class TwoStreamDetLocalVisualizer(DetLocalVisualizer):
     def _draw_instances(self, image: np.ndarray, instances: ['InstanceData'],
@@ -120,6 +136,36 @@ class TwoStreamDetLocalVisualizer(DetLocalVisualizer):
 
         return self.get_image()
     
+    def _draw_instances_bbox(self, image: np.ndarray, instances: ['InstanceData'],
+                        color: Optional[tuple]) -> np.ndarray:
+        """Draw instances of GT or prediction.
+
+        Args:
+            image (np.ndarray): The image to draw.
+            instances (:obj:`InstanceData`): Data structure for
+                instance-level annotations or predictions.
+            classes (List[str], optional): Category information.
+            palette (List[tuple], optional): Palette information
+                corresponding to the category.
+
+        Returns:
+            np.ndarray: the drawn image which channel is RGB.
+        """
+        self.set_image(image)
+
+        if 'bboxes' in instances and instances.bboxes.sum() > 0:
+            bboxes = instances.bboxes
+
+            colors = [color for bbox in bboxes]
+
+            self.draw_bboxes(
+                bboxes,
+                edge_colors=colors,
+                alpha=self.alpha,
+                line_widths=1)
+
+        return self.get_image()
+    
     @master_only
     def add_datasample(
             self,
@@ -167,11 +213,72 @@ class TwoStreamDetLocalVisualizer(DetLocalVisualizer):
 
         gt_img_data = None
         pred_img_data = None
+        result_img_data = None
+
+        true_positive_color = tuple([0, 200, 0])
+        false_positive_color = tuple([200, 0, 0])
+        false_negative_color = tuple([0, 0, 200])
 
         if data_sample is not None:
             data_sample = data_sample.cpu()
 
-        if draw_gt and data_sample is not None:
+        if draw_gt and draw_pred and data_sample is not None:
+            result_img_data = image
+            if 'pred_instances' in data_sample:
+                # Pred and gt
+                if 'gt_instances' in data_sample:
+                    true_positive_instances = InstanceData().new()
+                    false_positive_instances = InstanceData().new()
+                    false_negative_instances = InstanceData().new()
+                    true_positive_instances_bboxes = []
+                    false_positive_instances_bboxes = []
+                    false_negative_instances_bboxes = []
+                    pred_instances = data_sample.pred_instances
+                    pred_instances = pred_instances[
+                        pred_instances.scores > pred_score_thr]
+                    gt_instances = data_sample.gt_instances
+                    for pred_bbox in pred_instances.bboxes:
+                        flag = False
+                        for gt_bbox in gt_instances.bboxes:
+                            if bbox_iou(pred_bbox, gt_bbox) > 0.5:
+                                true_positive_instances_bboxes.append(pred_bbox.tolist())
+                                flag = True
+                                break
+                        if flag == False:
+                            false_positive_instances_bboxes.append(pred_bbox.tolist())
+
+                    for gt_bbox in gt_instances.bboxes:
+                        flag = False
+                        for pred_bbox in pred_instances.bboxes:
+                            if bbox_iou(pred_bbox, gt_bbox) > 0.35:
+                                flag = True
+                                break
+                        if flag == False:
+                            false_negative_instances_bboxes.append(gt_bbox.tolist())
+
+                    true_positive_instances.bboxes = torch.Tensor(true_positive_instances_bboxes)
+                    false_positive_instances.bboxes = torch.Tensor(false_positive_instances_bboxes)
+                    false_negative_instances.bboxes = torch.Tensor(false_negative_instances_bboxes)
+                    result_img_data = self._draw_instances_bbox(image, true_positive_instances,
+                                                        true_positive_color)
+                    result_img_data = self._draw_instances_bbox(result_img_data, false_positive_instances,
+                                                        false_positive_color)
+                    result_img_data = self._draw_instances_bbox(result_img_data, false_negative_instances,
+                                                            false_negative_color)
+                # False positive, only pred
+                else:
+                    pred_instances = data_sample.pred_instances
+                    pred_instances = pred_instances[
+                        pred_instances.scores > pred_score_thr]
+                    result_img_data = self._draw_instances_bbox(image, pred_instances,
+                                                        false_positive_color)
+            # False negative, only gt
+            elif 'gt_instances' in data_sample:
+                gt_img_data = self._draw_instances_bbox(image,
+                                                   data_sample.gt_instances,
+                                                   false_negative_color)
+
+        elif draw_gt and data_sample is not None:
             gt_img_data = image
             if 'gt_instances' in data_sample:
                 gt_img_data = self._draw_instances(image,
@@ -190,7 +297,7 @@ class TwoStreamDetLocalVisualizer(DetLocalVisualizer):
                 gt_img_data = self._draw_panoptic_seg(
                     gt_img_data, data_sample.gt_panoptic_seg, classes, palette)
 
-        if draw_pred and data_sample is not None:
+        elif draw_pred and data_sample is not None:
             pred_img_data = image
             if 'pred_instances' in data_sample:
                 pred_instances = data_sample.pred_instances
@@ -213,8 +320,8 @@ class TwoStreamDetLocalVisualizer(DetLocalVisualizer):
                     pred_img_data, data_sample.pred_panoptic_seg.numpy(),
                     classes, palette)
 
-        if gt_img_data is not None and pred_img_data is not None:
-            drawn_img = np.concatenate((gt_img_data, pred_img_data), axis=1)
+        if result_img_data is not None:
+            drawn_img = result_img_data
         elif gt_img_data is not None:
             drawn_img = gt_img_data
         elif pred_img_data is not None:

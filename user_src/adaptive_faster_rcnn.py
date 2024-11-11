@@ -202,17 +202,17 @@ class AdaptiveModel(BaseDetector):
             # out_rgb = x_rgb[i]
             # out_ir = x_ir[i]
 
-            # Draw feature map
-            ori_feat_rgb_name = "rgb_" + str(i) + "_ori_feat.jpg"
-            self.draw_featmap(x_rgb[i][0], ori_feat_rgb_name)
-            ori_feat_ir_name = "ir_" + str(i) + "_ori_feat.jpg"
-            self.draw_featmap(x_ir[i][0], ori_feat_ir_name)
+            # # Draw feature map
+            # ori_feat_rgb_name = "rgb_" + str(i) + "_ori_feat.jpg"
+            # self.draw_featmap(x_rgb[i][0], ori_feat_rgb_name)
+            # ori_feat_ir_name = "ir_" + str(i) + "_ori_feat.jpg"
+            # self.draw_featmap(x_ir[i][0], ori_feat_ir_name)
 
-            # Draw feature map after policy module
-            policy_feat_rgb_name = "rgb_" + str(i) + "_policy_feat.jpg"
-            self.draw_featmap(out_rgb[0], policy_feat_rgb_name)
-            policy_feat_ir_name = "ir_" + str(i) + "_policy_feat.jpg"
-            self.draw_featmap(out_ir[0], policy_feat_ir_name)
+            # # Draw feature map after policy module
+            # policy_feat_rgb_name = "rgb_" + str(i) + "_policy_feat.jpg"
+            # self.draw_featmap(out_rgb[0], policy_feat_rgb_name)
+            # policy_feat_ir_name = "ir_" + str(i) + "_policy_feat.jpg"
+            # self.draw_featmap(out_ir[0], policy_feat_ir_name)
 
             # # Print decisions
             # print(selections)
@@ -222,9 +222,9 @@ class AdaptiveModel(BaseDetector):
             # out = out_rgb + out_ir
             # out = torch.max(out_rgb, out_ir)
 
-            # Draw feature map after fusion module
-            fuse_feat_name = "fuse_" + str(i) + "_feat.jpg"
-            self.draw_featmap(out[0], fuse_feat_name)
+            # # Draw feature map after fusion module
+            # fuse_feat_name = "fuse_" + str(i) + "_feat.jpg"
+            # self.draw_featmap(out[0], fuse_feat_name)
 
             x_fuse.append(out)
             # x_rgb_out.append(out_rgb)
